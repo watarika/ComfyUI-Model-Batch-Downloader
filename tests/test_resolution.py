@@ -138,6 +138,36 @@ def test_redact_removes_exact_and_pattern_secrets():
     assert "[REDACTED]" in clean
 
 
+@pytest.mark.parametrize(
+    ("text", "secret", "expected"),
+    [
+        (
+            "download https://cdn.example.com/model?X-Amz-Signature=supersecret&part=1#signed",
+            "supersecret",
+            "https://cdn.example.com/model?[REDACTED]#[REDACTED]",
+        ),
+        (
+            "download https://alice:password@example.com/models/model.safetensors",
+            "password",
+            "https://[REDACTED]@example.com/models/model.safetensors",
+        ),
+    ],
+)
+def test_redact_sanitizes_authenticated_urls(text, secret, expected):
+    clean = redact(text)
+
+    assert secret not in clean
+    assert expected in clean
+
+
+def test_redact_safely_replaces_malformed_url():
+    clean = redact(
+        "download https://[alice:password@example.com/model?signature=supersecret"
+    )
+
+    assert clean == "download https://[REDACTED]"
+
+
 def test_resolution_error_redacts_civitai_token(tmp_path):
     item = ManifestItem(
         "https://civitai.com/api/download/models/42", "checkpoints"

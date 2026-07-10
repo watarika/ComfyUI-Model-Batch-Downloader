@@ -232,7 +232,7 @@ def run_downloads(
                 bufsize=1,
             )
             output_tail = deque(maxlen=40)
-            last_logged_percent = None
+            highest_percent = -1
             last_log_time = float("-inf")
             stream = _stream_process_lines(process, check)
             try:
@@ -244,16 +244,16 @@ def run_downloads(
                         status = parse_aria2_progress(safe_line)
                         if status is None:
                             continue
+                        if status.percent <= highest_percent:
+                            continue
+                        highest_percent = status.percent
                         if progress_callback:
                             progress_callback(
                                 item_start + status.percent,
                                 total_progress,
                             )
                         now = time.monotonic()
-                        if (
-                            status.percent != last_logged_percent
-                            and now - last_log_time >= 1.0
-                        ):
+                        if now - last_log_time >= 1.0:
                             eta = f"  ETA {status.eta}" if status.eta else ""
                             logger.info(
                                 "[Model Batch Downloader] %s %d%%  %s%s",
@@ -262,7 +262,6 @@ def run_downloads(
                                 status.speed or "-",
                                 eta,
                             )
-                            last_logged_percent = status.percent
                             last_log_time = now
                     return_code = process.wait()
                 except BaseException:
@@ -285,10 +284,9 @@ def run_downloads(
                     )
                 )
                 logger.info(
-                    "[Model Batch Downloader] fail   %s (exit=%s): %s",
+                    "[Model Batch Downloader] fail   %s (exit=%s)",
                     item.item_id,
                     return_code,
-                    detail,
                 )
             else:
                 elapsed = time.monotonic() - started

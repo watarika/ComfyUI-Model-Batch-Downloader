@@ -6,6 +6,9 @@ from typing import Mapping
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 
+_HTTP_URL_PATTERN = re.compile(r"https?://[^\s<>\"']+", re.IGNORECASE)
+
+
 @dataclass(frozen=True, slots=True)
 class AuthData:
     provider: str
@@ -53,6 +56,26 @@ def authenticated_url(url: str, auth: AuthData) -> str:
     )
 
 
+def _sanitize_url(match: re.Match[str]) -> str:
+    url = match.group(0)
+    try:
+        parsed = urlsplit(url)
+    except ValueError:
+        return f"{url.split(':', 1)[0]}://[REDACTED]"
+    netloc = parsed.netloc
+    if "@" in netloc:
+        netloc = f"[REDACTED]@{netloc.rsplit('@', 1)[1]}"
+    return urlunsplit(
+        (
+            parsed.scheme,
+            netloc,
+            parsed.path,
+            "[REDACTED]" if parsed.query else "",
+            "[REDACTED]" if parsed.fragment else "",
+        )
+    )
+
+
 def redact(text: str, secrets: tuple[str, ...] = ()) -> str:
     clean = text
     for secret in sorted((secret for secret in secrets if secret), key=len, reverse=True):
@@ -63,4 +86,4 @@ def redact(text: str, secrets: tuple[str, ...] = ()) -> str:
         clean,
     )
     clean = re.sub(r"(?i)([?&]token=)[^&\s]+", r"\1[REDACTED]", clean)
-    return clean
+    return _HTTP_URL_PATTERN.sub(_sanitize_url, clean)

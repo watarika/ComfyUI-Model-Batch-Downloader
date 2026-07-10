@@ -244,6 +244,45 @@ def test_streams_batch_progress_and_logs_one_summary_per_second(
     assert "done   b" in caplog.text
 
 
+def test_progress_ignores_decreasing_and_duplicate_percentages(
+    tmp_path, caplog, monkeypatch
+):
+    resolved = make_item(tmp_path)
+    progress = []
+    clock = [0.0]
+
+    def monotonic():
+        clock[0] += 1.1
+        return clock[0]
+
+    monkeypatch.setattr(
+        "model_batch_downloader.aria2_runner.time.monotonic",
+        monotonic,
+    )
+    process = FakeProcess(
+        [
+            "[#id 3MiB/4MiB(75%) CN:8 DL:1MiB ETA:1s]\n",
+            "[#id 2MiB/4MiB(50%) CN:8 DL:1MiB ETA:2s]\n",
+            "[#id 3MiB/4MiB(75%) CN:8 DL:1MiB ETA:1s]\n",
+            "[#id 4MiB/4MiB(90%) CN:8 DL:1MiB ETA:1s]\n",
+        ],
+        on_wait=lambda: resolved.destination.write_bytes(b"done"),
+    )
+
+    with caplog.at_level(logging.INFO):
+        run_downloads(
+            (resolved,),
+            "aria2c",
+            {},
+            start_process=lambda *_args, **_kwargs: process,
+            progress_callback=lambda current, total: progress.append((current, total)),
+        )
+
+    assert progress == [(0, 100), (75, 100), (90, 100), (100, 100)]
+    assert caplog.text.count("model 75%") == 1
+    assert "model 50%" not in caplog.text
+
+
 def test_skip_advances_one_complete_batch_interval(tmp_path):
     target = tmp_path / "model.safetensors"
     target.write_bytes(b"ready")
@@ -264,7 +303,11 @@ def test_skip_advances_one_complete_batch_interval(tmp_path):
 def test_failure_log_and_summary_redact_tokens(tmp_path, caplog):
     resolved = make_item(tmp_path)
     process = FakeProcess(
-        ["Authorization: Bearer secret\n"],
+        [
+            "[#id 1MiB/4MiB(25%) CN:8 DL:1MiB ETA:3s]\n",
+            "raw aria2 failure detail\n",
+            "Authorization: Bearer secret\n",
+        ],
         returncode=3,
     )
 
@@ -276,9 +319,15 @@ def test_failure_log_and_summary_redact_tokens(tmp_path, caplog):
             start_process=lambda *_args, **_kwargs: process,
         )
 
-    combined = caplog.text + str(captured.value)
+    summary = str(captured.value)
+    combined = caplog.text + summary
     assert "secret" not in combined
-    assert "[REDACTED]" in combined
+    assert "[REDACTED]" in summary
+    assert "raw aria2 failure detail" in summary
+    assert "raw aria2 failure detail" not in caplog.text
+    assert "[#id" not in caplog.text
+    assert "[Model Batch Downloader] fail   model (exit=3)" in caplog.text
+    assert all("\n" not in record.getMessage() for record in caplog.records)
 
 
 def test_interruption_terminates_process_and_propagates(tmp_path):
