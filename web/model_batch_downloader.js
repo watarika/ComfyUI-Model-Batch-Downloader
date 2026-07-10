@@ -7,6 +7,7 @@ import {
   removeRow,
   serializeRows,
 } from "./manifest_state.js";
+import { editorHeight, hideWidget } from "./widget_layout.js";
 
 const FIELD_LABELS = {
   url: "URL",
@@ -16,11 +17,6 @@ const FIELD_LABELS = {
   id: "ID (optional)",
   split: "Connections",
 };
-
-function hideWidget(widget) {
-  widget.type = "converted-widget";
-  widget.computeSize = () => [0, -4];
-}
 
 function field(row, key, onChange, type = "text") {
   const label = document.createElement("label");
@@ -61,7 +57,9 @@ function mountEditor(node, manifestWidget) {
   let rows = parseRows(manifestWidget.value);
   const root = document.createElement("div");
   root.className = "model-batch-downloader-table";
-  root.style.cssText = "width:100%;box-sizing:border-box;padding:4px";
+  root.style.cssText =
+    "width:100%;height:100%;box-sizing:border-box;padding:4px;overflow:auto";
+  let editorWidget;
 
   const sync = () => {
     manifestWidget.value = serializeRows(rows);
@@ -136,16 +134,25 @@ function mountEditor(node, manifestWidget) {
       render();
     };
     root.append(add);
-    node.setSize([
-      Math.max(node.size[0], 520),
-      Math.max(node.size[1], 260 + rows.length * 190),
-    ]);
+    if (editorWidget) {
+      const size = node.computeSize();
+      node.setSize([Math.max(size[0], 520), size[1]]);
+      node.graph?.setDirtyCanvas(true, true);
+    }
   };
 
   hideWidget(manifestWidget);
-  node.addDOMWidget("downloads", "model-batch-downloader-table", root, {
-    serialize: false,
-  });
+  editorWidget = node.addDOMWidget(
+    "downloads",
+    "model-batch-downloader-table",
+    root,
+    {
+      getMinHeight: () => editorHeight(rows.length),
+      getMaxHeight: () => editorHeight(rows.length),
+      margin: 4,
+    },
+  );
+  editorWidget.serialize = false;
   sync();
   render();
 }
