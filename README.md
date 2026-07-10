@@ -61,6 +61,18 @@ python main.py
 
 2種類のdownload nodeは、任意型の`passthrough`を入力と出力に持ちます。既存の接続途中に挿入できるほか、未接続でもoutput nodeとして実行できます。取得結果を使う場合は`download_result`を対応するDownloaded Loaderへ接続し、manifestの`id`を指定します。
 
+## ダウンロード進捗
+
+実行中のdownload nodeには、KSamplerと同じComfyUI標準の進捗バーが表示されます。複数ファイルの場合もバーはリセットせず、バッチ全体を0～100%として進みます。
+
+ComfyUIのログには約1秒ごとに現在のID、進捗率、速度、ETAを表示します。
+
+```text
+[Model Batch Downloader] anima_model 42%  18.3MiB  ETA 31s
+```
+
+認証トークンと認証済みURLはログへ出力しません。
+
 ## Manifest
 
 ルートは1件以上のJSON配列です。各項目で使えるフィールドは次のとおりです。

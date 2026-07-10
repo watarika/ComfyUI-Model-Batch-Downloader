@@ -52,9 +52,20 @@ def test_real_aria2_downloads_from_local_range_server(tmp_path):
             Path(destination.name),
             None,
         )
-        result = run_downloads((item,), shutil.which("aria2c"), {})
+        progress = []
+        result = run_downloads(
+            (item,),
+            shutil.which("aria2c"),
+            {},
+            progress_callback=lambda current, total: progress.append(
+                (current, total)
+            ),
+        )
         assert result.entries["tiny"].status == "downloaded"
         assert destination.read_bytes() == DATA
+        assert progress[0] == (0, 100)
+        assert progress[-1] == (100, 100)
+        assert progress == sorted(progress)
     finally:
         server.shutdown()
         server.server_close()
