@@ -3,6 +3,8 @@ from __future__ import annotations
 import os
 import shutil
 
+import comfy.model_management
+import comfy.utils
 import folder_paths
 
 from .aria2_runner import run_downloads
@@ -45,7 +47,17 @@ def execute_manifest(
         probe_filename,
         os.environ,
     )
-    return passthrough, run_downloads(resolved, aria2, os.environ)
+    progress = comfy.utils.ProgressBar(len(resolved) * 100)
+    result = run_downloads(
+        resolved,
+        aria2,
+        os.environ,
+        progress_callback=progress.update_absolute,
+        check_interrupted=(
+            comfy.model_management.throw_exception_if_processing_interrupted
+        ),
+    )
+    return passthrough, result
 
 
 class _DownloadNodeBase:

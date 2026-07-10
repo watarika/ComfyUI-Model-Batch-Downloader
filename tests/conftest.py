@@ -7,6 +7,28 @@ PLUGIN_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PLUGIN_ROOT))
 
 
+if "comfy" not in sys.modules:
+    comfy = types.ModuleType("comfy")
+    comfy.__path__ = []
+    comfy_utils = types.ModuleType("comfy.utils")
+    comfy_model_management = types.ModuleType("comfy.model_management")
+
+    class ProgressBar:
+        def __init__(self, total):
+            self.total = total
+
+        def update_absolute(self, value, total=None):
+            return None
+
+    comfy_utils.ProgressBar = ProgressBar
+    comfy_model_management.throw_exception_if_processing_interrupted = lambda: None
+    comfy.utils = comfy_utils
+    comfy.model_management = comfy_model_management
+    sys.modules["comfy"] = comfy
+    sys.modules["comfy.utils"] = comfy_utils
+    sys.modules["comfy.model_management"] = comfy_model_management
+
+
 if "folder_paths" not in sys.modules:
     folder_paths = types.ModuleType("folder_paths")
     folder_paths.get_folder_paths = lambda name: [str(PLUGIN_ROOT / ".test-models" / name)]
