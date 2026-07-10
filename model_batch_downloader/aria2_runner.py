@@ -5,7 +5,7 @@ from dataclasses import dataclass
 import logging
 import os
 from pathlib import Path
-from queue import Empty, Queue
+from queue import Empty, Full, Queue
 import subprocess
 import tempfile
 import threading
@@ -20,6 +20,7 @@ from .security import auth_for_url, authenticated_url, redact
 
 logger = logging.getLogger(__name__)
 _STREAM_END = object()
+_STREAM_QUEUE_SIZE = 40
 
 
 @dataclass(frozen=True, slots=True)
@@ -92,29 +93,49 @@ def _existing_complete_path(item: ResolvedItem) -> Path | None:
 
 
 def _stream_process_lines(process, check_interrupted):
-    output = Queue()
+    output = Queue(maxsize=_STREAM_QUEUE_SIZE)
+    stopping = threading.Event()
+
+    def put_output(value):
+        while not stopping.is_set():
+            try:
+                output.put(value, timeout=0.1)
+                return True
+            except Full:
+                continue
+        return False
 
     def read_output():
         try:
             if process.stdout is not None:
                 for line in process.stdout:
-                    output.put(line)
+                    if not put_output(line):
+                        break
         finally:
-            output.put(_STREAM_END)
+            put_output(_STREAM_END)
 
     reader = threading.Thread(target=read_output, daemon=True)
     reader.start()
-    while True:
-        check_interrupted()
-        try:
-            line = output.get(timeout=0.1)
-        except Empty:
-            if process.poll() is not None and not reader.is_alive():
+    try:
+        while True:
+            check_interrupted()
+            try:
+                line = output.get(timeout=0.1)
+            except Empty:
+                if process.poll() is not None and not reader.is_alive():
+                    break
+                continue
+            if line is _STREAM_END:
                 break
-            continue
-        if line is _STREAM_END:
-            break
-        yield line
+            yield line
+    except BaseException:
+        try:
+            _stop_process(process)
+        finally:
+            raise
+    finally:
+        stopping.set()
+        reader.join()
 
 
 def _stop_process(process):
@@ -213,39 +234,45 @@ def run_downloads(
             output_tail = deque(maxlen=40)
             last_logged_percent = None
             last_log_time = float("-inf")
+            stream = _stream_process_lines(process, check)
             try:
-                for line in _stream_process_lines(process, check):
-                    safe_line = redact(line.rstrip(), secrets)
-                    if safe_line:
-                        output_tail.append(safe_line)
-                    status = parse_aria2_progress(safe_line)
-                    if status is None:
-                        continue
-                    if progress_callback:
-                        progress_callback(
-                            item_start + status.percent,
-                            total_progress,
-                        )
-                    now = time.monotonic()
-                    if (
-                        status.percent != last_logged_percent
-                        and now - last_log_time >= 1.0
-                    ):
-                        eta = f"  ETA {status.eta}" if status.eta else ""
-                        logger.info(
-                            "[Model Batch Downloader] %s %d%%  %s%s",
-                            item.item_id,
-                            status.percent,
-                            status.speed or "-",
-                            eta,
-                        )
-                        last_logged_percent = status.percent
-                        last_log_time = now
-                return_code = process.wait()
-            except Exception:
-                propagate_exception = True
-                _stop_process(process)
-                raise
+                try:
+                    for line in stream:
+                        safe_line = redact(line.rstrip(), secrets)
+                        if safe_line:
+                            output_tail.append(safe_line)
+                        status = parse_aria2_progress(safe_line)
+                        if status is None:
+                            continue
+                        if progress_callback:
+                            progress_callback(
+                                item_start + status.percent,
+                                total_progress,
+                            )
+                        now = time.monotonic()
+                        if (
+                            status.percent != last_logged_percent
+                            and now - last_log_time >= 1.0
+                        ):
+                            eta = f"  ETA {status.eta}" if status.eta else ""
+                            logger.info(
+                                "[Model Batch Downloader] %s %d%%  %s%s",
+                                item.item_id,
+                                status.percent,
+                                status.speed or "-",
+                                eta,
+                            )
+                            last_logged_percent = status.percent
+                            last_log_time = now
+                    return_code = process.wait()
+                except BaseException:
+                    propagate_exception = True
+                    try:
+                        _stop_process(process)
+                    finally:
+                        raise
+            finally:
+                stream.close()
 
             if return_code != 0 or not item.destination.is_file() or sidecar.exists():
                 detail = "\n".join(output_tail) or "aria2 did not complete the file"

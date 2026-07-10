@@ -1,5 +1,7 @@
 import logging
 from pathlib import Path
+from queue import Queue
+from threading import Thread
 
 import pytest
 
@@ -305,3 +307,67 @@ def test_interruption_terminates_process_and_propagates(tmp_path):
         )
 
     assert process.terminated is True
+
+
+def test_base_exception_terminates_process_and_reader_then_propagates(
+    tmp_path, monkeypatch
+):
+    class Cancelled(BaseException):
+        pass
+
+    resolved = make_item(tmp_path)
+    process = FakeProcess(["noise\n"] * 10_000)
+    readers = []
+
+    def tracking_thread(*args, **kwargs):
+        reader = Thread(*args, **kwargs)
+        readers.append(reader)
+        return reader
+
+    monkeypatch.setattr(
+        "model_batch_downloader.aria2_runner.threading.Thread",
+        tracking_thread,
+    )
+
+    def check_interrupted():
+        raise Cancelled("cancelled")
+
+    with pytest.raises(Cancelled, match="cancelled"):
+        run_downloads(
+            (resolved,),
+            "aria2c",
+            {},
+            start_process=lambda *_args, **_kwargs: process,
+            check_interrupted=check_interrupted,
+        )
+
+    assert process.terminated is True
+    assert len(readers) == 1
+    assert readers[0].is_alive() is False
+
+
+def test_stream_reader_uses_bounded_queue(tmp_path, monkeypatch):
+    resolved = make_item(tmp_path)
+    maxsizes = []
+
+    def tracking_queue(maxsize=0):
+        maxsizes.append(maxsize)
+        return Queue(maxsize)
+
+    monkeypatch.setattr(
+        "model_batch_downloader.aria2_runner.Queue",
+        tracking_queue,
+    )
+
+    run_downloads(
+        (resolved,),
+        "aria2c",
+        {},
+        start_process=lambda *_args, **_kwargs: FakeProcess(
+            ["notice\n"],
+            on_wait=lambda: resolved.destination.write_bytes(b"done"),
+        ),
+    )
+
+    assert len(maxsizes) == 1
+    assert maxsizes[0] > 0
