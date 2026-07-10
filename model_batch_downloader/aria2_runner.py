@@ -1,16 +1,25 @@
 from __future__ import annotations
 
+from collections import deque
 from dataclasses import dataclass
+import logging
 import os
 from pathlib import Path
+from queue import Empty, Queue
 import subprocess
 import tempfile
+import threading
 import time
 from typing import Callable, Mapping
 from urllib.parse import urlsplit
 
 from .manifest import ResolvedItem
+from .progress import format_bytes, parse_aria2_progress
 from .security import auth_for_url, authenticated_url, redact
+
+
+logger = logging.getLogger(__name__)
+_STREAM_END = object()
 
 
 @dataclass(frozen=True, slots=True)
@@ -82,20 +91,69 @@ def _existing_complete_path(item: ResolvedItem) -> Path | None:
     return None
 
 
+def _stream_process_lines(process, check_interrupted):
+    output = Queue()
+
+    def read_output():
+        try:
+            if process.stdout is not None:
+                for line in process.stdout:
+                    output.put(line)
+        finally:
+            output.put(_STREAM_END)
+
+    reader = threading.Thread(target=read_output, daemon=True)
+    reader.start()
+    while True:
+        check_interrupted()
+        try:
+            line = output.get(timeout=0.1)
+        except Empty:
+            if process.poll() is not None and not reader.is_alive():
+                break
+            continue
+        if line is _STREAM_END:
+            break
+        yield line
+
+
+def _stop_process(process):
+    if process.poll() is not None:
+        return
+    process.terminate()
+    try:
+        process.wait(timeout=5)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        process.wait()
+
+
 def run_downloads(
     items: tuple[ResolvedItem, ...],
     executable: str,
     environ: Mapping[str, str] | None = None,
-    run_process: Callable[..., object] = subprocess.run,
+    start_process: Callable[..., object] = subprocess.Popen,
+    progress_callback: Callable[[int, int], None] | None = None,
+    check_interrupted: Callable[[], None] | None = None,
 ) -> DownloadResult:
     environment = os.environ if environ is None else environ
+    check = check_interrupted or (lambda: None)
+    total_progress = len(items) * 100
+    if progress_callback:
+        progress_callback(0, total_progress)
     entries: dict[str, DownloadRecord] = {}
     failures: list[DownloadFailure] = []
 
-    for item in items:
+    for item_index, item in enumerate(items):
+        item_start = item_index * 100
+        item_end = item_start + 100
         sidecar = Path(str(item.destination) + ".aria2")
         complete = _existing_complete_path(item)
         if complete and not sidecar.exists():
+            logger.info(
+                "[Model Batch Downloader] skip   %s (already exists)",
+                item.item_id,
+            )
             entries[item.item_id] = DownloadRecord(
                 item.item_id,
                 item.model_type,
@@ -105,13 +163,22 @@ def run_downloads(
                 complete.stat().st_size,
                 0.0,
             )
+            if progress_callback:
+                progress_callback(item_end, total_progress)
             continue
 
+        logger.info(
+            "[Model Batch Downloader] start  %s (%d/%d)",
+            item.item_id,
+            item_index + 1,
+            len(items),
+        )
         item.destination.parent.mkdir(parents=True, exist_ok=True)
         started_resumed = sidecar.exists()
         control_text, secrets = _control_text(item, environment)
         control_path: Path | None = None
         started = time.monotonic()
+        propagate_exception = False
 
         try:
             with tempfile.NamedTemporaryFile(
@@ -127,20 +194,61 @@ def run_downloads(
             except OSError:
                 pass
 
-            completed = run_process(
-                [executable, "--input-file", str(control_path)],
-                capture_output=True,
+            process = start_process(
+                [
+                    executable,
+                    "--show-console-readout=true",
+                    "--summary-interval=1",
+                    "--console-log-level=notice",
+                    "--input-file",
+                    str(control_path),
+                ],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
                 text=True,
-                check=False,
+                encoding="utf-8",
+                errors="replace",
+                bufsize=1,
             )
-            return_code = getattr(completed, "returncode", None)
-            stdout = getattr(completed, "stdout", "") or ""
-            stderr = getattr(completed, "stderr", "") or ""
+            output_tail = deque(maxlen=40)
+            last_logged_percent = None
+            last_log_time = float("-inf")
+            try:
+                for line in _stream_process_lines(process, check):
+                    safe_line = redact(line.rstrip(), secrets)
+                    if safe_line:
+                        output_tail.append(safe_line)
+                    status = parse_aria2_progress(safe_line)
+                    if status is None:
+                        continue
+                    if progress_callback:
+                        progress_callback(
+                            item_start + status.percent,
+                            total_progress,
+                        )
+                    now = time.monotonic()
+                    if (
+                        status.percent != last_logged_percent
+                        and now - last_log_time >= 1.0
+                    ):
+                        eta = f"  ETA {status.eta}" if status.eta else ""
+                        logger.info(
+                            "[Model Batch Downloader] %s %d%%  %s%s",
+                            item.item_id,
+                            status.percent,
+                            status.speed or "-",
+                            eta,
+                        )
+                        last_logged_percent = status.percent
+                        last_log_time = now
+                return_code = process.wait()
+            except Exception:
+                propagate_exception = True
+                _stop_process(process)
+                raise
+
             if return_code != 0 or not item.destination.is_file() or sidecar.exists():
-                detail = redact(
-                    (stderr or stdout or "aria2 did not complete the file")[:2000],
-                    secrets,
-                )
+                detail = "\n".join(output_tail) or "aria2 did not complete the file"
                 failures.append(
                     DownloadFailure(
                         item.item_id,
@@ -149,18 +257,32 @@ def run_downloads(
                         detail,
                     )
                 )
-                continue
-
-            entries[item.item_id] = DownloadRecord(
-                item.item_id,
-                item.model_type,
-                item.relative_path.as_posix(),
-                str(item.destination),
-                "resumed" if started_resumed else "downloaded",
-                item.destination.stat().st_size,
-                time.monotonic() - started,
-            )
+                logger.info(
+                    "[Model Batch Downloader] fail   %s (exit=%s): %s",
+                    item.item_id,
+                    return_code,
+                    detail,
+                )
+            else:
+                elapsed = time.monotonic() - started
+                entries[item.item_id] = DownloadRecord(
+                    item.item_id,
+                    item.model_type,
+                    item.relative_path.as_posix(),
+                    str(item.destination),
+                    "resumed" if started_resumed else "downloaded",
+                    item.destination.stat().st_size,
+                    elapsed,
+                )
+                logger.info(
+                    "[Model Batch Downloader] done   %s %s in %.1fs",
+                    item.item_id,
+                    format_bytes(item.destination.stat().st_size),
+                    elapsed,
+                )
         except Exception as exception:
+            if propagate_exception:
+                raise
             failures.append(
                 DownloadFailure(
                     item.item_id,
@@ -172,6 +294,9 @@ def run_downloads(
         finally:
             if control_path is not None:
                 control_path.unlink(missing_ok=True)
+
+        if progress_callback:
+            progress_callback(item_end, total_progress)
 
     if failures:
         raise BatchDownloadError(tuple(failures))
