@@ -2,7 +2,7 @@
 
 [English] [<a href="README_ja.md">日本語</a>]
 
-This custom node downloads multiple ComfyUI model files from Hugging Face, Civitai, and arbitrary HTTP/HTTPS URLs with `aria2c`, then loads them within the same ComfyUI queue. It supports checkpoints, diffusion models, text encoders, VAEs, and LoRAs.
+This custom node downloads multiple ComfyUI model files from Hugging Face, Civitai, and arbitrary HTTP/HTTPS URLs with `aria2c`, then loads supported files within the same ComfyUI queue. Its thirteen destination categories are `checkpoints`, `diffusion_models`, `text_encoders`, `vae`, `loras`, `controlnet`, `embeddings`, `upscale_models`, `onnx`, `sam3`, `llm`, `ultralytics_bbox`, and `ultralytics_segm`.
 
 Existing files are not overwritten, and checksums are not verified. Incomplete files with an `.aria2` sidecar are resumed.
 
@@ -59,6 +59,8 @@ Tokens are sent only to the corresponding domains and are not stored in the mani
 - `Load Diffusion Model (Downloaded)`: Loads models from the `diffusion_models` category using ComfyUI's standard diffusion-model loader behavior.
 - `Load CLIP (Downloaded)`: Uses the same `type` choices as ComfyUI's standard `Load CLIP`, including `krea2`, `ideogram4`, and `flux2`.
 - `Load VAE (Downloaded)`: Loads models from the `vae` category using ComfyUI's standard VAE loader behavior.
+- `Load ControlNet (Downloaded)`: Loads models from the `controlnet` category using ComfyUI's standard ControlNet loader behavior.
+- `Load Upscale Model (Downloaded)`: Loads models from the `upscale_models` category using ComfyUI's standard upscale-model loader behavior.
 - `Load LoRA (Downloaded)`: Loads models from the `loras` category using ComfyUI's standard LoRA loader behavior. For model-only LoRAs, `strength_clip` can be set to 0.
 
 Both download nodes have an arbitrary-type `passthrough` input and output. They can be inserted into an existing connection or run unconnected as output nodes. To use downloaded results, connect `download_result` to the corresponding Downloaded Loader and specify the manifest `id`.
@@ -90,11 +92,31 @@ The root is a JSON array containing at least one item. Each item supports these 
 | Field | Required | Description |
 |---|---:|---|
 | `url` | Yes | HTTP/HTTPS URL |
-| `model_type` | Yes | `checkpoints`, `diffusion_models`, `text_encoders`, `vae`, `loras` |
+| `model_type` | Yes | One of the thirteen categories in the compatibility table below |
 | `subfolder` | No | Destination under the corresponding ComfyUI model root |
 | `filename` | No | If omitted, resolved from the response or URL |
 | `id` | No | If omitted, the filename without its final extension |
 | `split` | No | 1–16; default 16 |
+
+Without `subfolder`, each category uses the following directory. A configured ComfyUI folder path for the category takes precedence over this default.
+
+| `model_type` | Default directory | Companion loader / consumer |
+|---|---|---|
+| `checkpoints` | `models/checkpoints` | `Load Checkpoint (Downloaded)` |
+| `diffusion_models` | `models/diffusion_models` | `Load Diffusion Model (Downloaded)` |
+| `text_encoders` | `models/text_encoders` | `Load CLIP (Downloaded)` |
+| `vae` | `models/vae` | `Load VAE (Downloaded)` |
+| `loras` | `models/loras` | `Load LoRA (Downloaded)` |
+| `controlnet` | `models/controlnet` | `Load ControlNet (Downloaded)` |
+| `embeddings` | `models/embeddings` | ComfyUI prompt references; no companion loader |
+| `upscale_models` | `models/upscale_models` | `Load Upscale Model (Downloaded)` |
+| `onnx` | `models/onnx` | Impact Pack |
+| `sam3` | `models/sam3` | `comfyui-sam3` |
+| `llm` | `models/llm` | External LLM consumer; no companion loader |
+| `ultralytics_bbox` | `models/ultralytics/bbox` | Impact Subpack |
+| `ultralytics_segm` | `models/ultralytics/segm` | Impact Subpack |
+
+Embedding files are used through prompt references and have no companion loader. LLM support covers single-file downloads only; it does not provide repository snapshots or multi-file inference. Impact Pack, `comfyui-sam3`, Impact Subpack, and other optional custom nodes are not dependencies of this downloader; install and use them separately when you need their consumer nodes.
 
 A concrete usage example for Anima:
 
@@ -140,6 +162,7 @@ If a URL resolves to `model.fp16.safetensors` and `id` is omitted, the ID is `mo
 - Civitai 401/403: Check `CIVITAI_API_TOKEN`.
 - `duplicate id`: Assign a unique explicit `id` to one of the entries.
 - category mismatch: Connect to the Downloaded Loader corresponding to the ID's `model_type`.
+- No loader for an extended category: Use the consumer shown in the compatibility table. External consumer plugins are independently installed and maintained; this downloader only owns downloading the file to the selected destination.
 
 ## Comfy Registry publishing
 

@@ -139,3 +139,58 @@ def test_readmes_describe_generic_scope_with_model_family_examples():
 
     assert "used with Illustrious, Anima, and Krea 2" not in english
     assert "Illustrious、Anima、Krea 2で使う" not in japanese
+
+
+def test_readmes_document_extended_category_contract_in_both_languages():
+    english = (ROOT / "README.md").read_text(encoding="utf-8")
+    japanese = (ROOT / "README_ja.md").read_text(encoding="utf-8")
+
+    categories = (
+        "checkpoints",
+        "diffusion_models",
+        "text_encoders",
+        "vae",
+        "loras",
+        "controlnet",
+        "embeddings",
+        "upscale_models",
+        "onnx",
+        "sam3",
+        "llm",
+        "ultralytics_bbox",
+        "ultralytics_segm",
+    )
+    destinations = (
+        "models/checkpoints",
+        "models/diffusion_models",
+        "models/text_encoders",
+        "models/vae",
+        "models/loras",
+        "models/controlnet",
+        "models/embeddings",
+        "models/upscale_models",
+        "models/onnx",
+        "models/sam3",
+        "models/llm",
+        "models/ultralytics/bbox",
+        "models/ultralytics/segm",
+    )
+    for readme in (english, japanese):
+        for category in categories:
+            assert f"`{category}`" in readme
+        for destination in destinations:
+            assert f"`{destination}`" in readme
+        assert "`Load ControlNet (Downloaded)`" in readme
+        assert "`Load Upscale Model (Downloaded)`" in readme
+        assert "Impact Pack" in readme
+        assert "`comfyui-sam3`" in readme
+        assert "Impact Subpack" in readme
+
+    assert "prompt references" in english
+    assert "プロンプト参照" in japanese
+    assert "single-file downloads only" in english
+    assert "単一ファイルのダウンロードのみ" in japanese
+    assert "repository snapshots or multi-file inference" in english
+    assert "リポジトリsnapshotや複数ファイル推論" in japanese
+    assert "optional custom nodes are not dependencies" in english
+    assert "任意のcustom nodeはこのdownloaderの依存関係ではありません" in japanese
