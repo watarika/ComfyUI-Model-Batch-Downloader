@@ -99,9 +99,6 @@ def test_readmes_are_bilingual_and_cover_the_same_topics():
         "git clone https://github.com/watarika/ComfyUI-Model-Batch-Downloader.git "
         "custom_nodes/ComfyUI-Model-Batch-Downloader"
     ) in english
-    assert "REGISTRY_ACCESS_TOKEN" in english
-    assert "REGISTRY_ACCESS_TOKEN" in japanese
-
     section_pairs = (
         ("## Requirements", "## 必要なもの"),
         ("## Installation", "## インストール"),
@@ -111,12 +108,43 @@ def test_readmes_are_bilingual_and_cover_the_same_topics():
         ("## Manifest", "## Manifest"),
         ("## Existing files and errors", "## 既存ファイルとエラー"),
         ("## Troubleshooting", "## トラブルシューティング"),
-        ("## Comfy Registry publishing", "## Comfy Registryへの公開"),
-        ("## Development", "## 開発時の確認"),
     )
     for english_heading, japanese_heading in section_pairs:
         assert english_heading in english
         assert japanese_heading in japanese
+
+
+def test_maintainer_information_lives_only_in_contributing():
+    english = (ROOT / "README.md").read_text(encoding="utf-8")
+    japanese = (ROOT / "README_ja.md").read_text(encoding="utf-8")
+    contributing = (ROOT / "CONTRIBUTING.md").read_text(encoding="utf-8")
+
+    for readme in (english, japanese):
+        assert "REGISTRY_ACCESS_TOKEN" not in readme
+        assert "uv run --no-project" not in readme
+        assert "node --test" not in readme
+        assert "uvx ruff check" not in readme
+
+    assert "## Comfy Registry publishing" not in english
+    assert "## Development" not in english
+    assert "## Comfy Registryへの公開" not in japanese
+    assert "## 開発時の確認" not in japanese
+
+    for required in (
+        "# Contributing",
+        "## Development checks",
+        "uv run --no-project --with pytest --with aiohttp python -m pytest -q",
+        "node --test",
+        "uvx ruff check .",
+        "## Comfy Registry publishing",
+        "watarika",
+        "REGISTRY_ACCESS_TOKEN",
+        "pyproject.toml",
+        "main",
+        "Publish to Comfy registry",
+        "semantic version",
+    ):
+        assert required in contributing
 
 
 def test_readmes_describe_generic_scope_with_model_family_examples():

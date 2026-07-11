@@ -164,14 +164,3 @@ If a URL resolves to `model.fp16.safetensors` and `id` is omitted, the ID is `mo
 - category mismatch: Connect to the Downloaded Loader corresponding to the ID's `model_type`.
 - No loader for an extended category: Use the consumer shown in the compatibility table. External consumer plugins are independently installed and maintained; this downloader only owns downloading the file to the selected destination.
 
-## Comfy Registry publishing
-
-The Publisher ID is `watarika`. The GitHub Secret `REGISTRY_ACCESS_TOKEN` must contain the Comfy Registry API key. Publishing can be started manually, and also runs when `pyproject.toml` changes on `main`.
-
-## Development
-
-```powershell
-uv run --with pytest --with aiohttp --no-project pytest tests -v
-node --test tests-js/manifest_state.test.mjs
-uvx ruff check .
-```

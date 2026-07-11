@@ -164,14 +164,3 @@ URLが`model.fp16.safetensors`へ解決され、`id`が省略されていればI
 - category mismatch: IDの`model_type`に対応するDownloaded Loaderへ接続してください。
 - 拡張カテゴリのloaderがない: 互換性表に記載したconsumerを使用してください。外部consumer pluginのインストールと保守は各plugin側が担い、このdownloaderは選択した保存先へのファイル取得だけを担います。
 
-## Comfy Registryへの公開
-
-Publisher IDは`watarika`です。GitHub Secretの`REGISTRY_ACCESS_TOKEN`にComfy RegistryのAPI keyを設定してください。公開は手動で実行できるほか、`main`上で`pyproject.toml`が変更されたときに実行されます。
-
-## 開発時の確認
-
-```powershell
-uv run --with pytest --with aiohttp --no-project pytest tests -v
-node --test tests-js/manifest_state.test.mjs
-uvx ruff check .
-```
