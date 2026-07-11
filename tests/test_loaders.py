@@ -99,6 +99,87 @@ def test_vae_loader_delegates_relative_path(monkeypatch):
     assert seen == ["folder/model.safetensors"]
 
 
+def test_controlnet_loader_delegates_relative_path(monkeypatch):
+    seen = []
+    monkeypatch.setattr(
+        subject.ControlNetLoader,
+        "load_controlnet",
+        lambda self, name: seen.append(name) or ("controlnet",),
+    )
+    output = subject.ModelBatchDownloaderControlNetLoader().load(
+        result("controlnet"), "asset"
+    )
+    assert output == ("controlnet",)
+    assert seen == ["folder/model.safetensors"]
+
+
+def test_controlnet_loader_rejects_wrong_category_before_delegation(monkeypatch):
+    seen = []
+    monkeypatch.setattr(
+        subject.ControlNetLoader,
+        "load_controlnet",
+        lambda self, name: seen.append(name) or ("controlnet",),
+    )
+    try:
+        subject.ModelBatchDownloaderControlNetLoader().load(result("vae"), "asset")
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("category mismatch must fail")
+    assert seen == []
+
+
+def test_upscale_loader_delegates_and_unwraps_node_output(monkeypatch):
+    seen = []
+    node_output = type("NodeOutput", (), {"result": ("upscale",)})()
+    monkeypatch.setattr(
+        subject.UpscaleModelLoader,
+        "execute",
+        classmethod(lambda cls, name: seen.append(name) or node_output),
+    )
+    output = subject.ModelBatchDownloaderUpscaleModelLoader().load(
+        result("upscale_models"), "asset"
+    )
+    assert output == ("upscale",)
+    assert seen == ["folder/model.safetensors"]
+
+
+def test_upscale_loader_rejects_wrong_category_before_delegation(monkeypatch):
+    seen = []
+    node_output = type("NodeOutput", (), {"result": ("upscale",)})()
+    monkeypatch.setattr(
+        subject.UpscaleModelLoader,
+        "execute",
+        classmethod(lambda cls, name: seen.append(name) or node_output),
+    )
+    try:
+        subject.ModelBatchDownloaderUpscaleModelLoader().load(
+            result("checkpoints"), "asset"
+        )
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("category mismatch must fail")
+    assert seen == []
+
+
+def test_upscale_loader_rejects_empty_node_output(monkeypatch):
+    node_output = type("NodeOutput", (), {"result": None})()
+    monkeypatch.setattr(
+        subject.UpscaleModelLoader,
+        "execute",
+        classmethod(lambda cls, name: node_output),
+    )
+    try:
+        subject.ModelBatchDownloaderUpscaleModelLoader().load(
+            result("upscale_models"), "asset"
+        )
+    except RuntimeError as exc:
+        assert "result" in str(exc)
+    else:
+        raise AssertionError("empty NodeOutput must fail")
+
+
 def test_lora_loader_delegates_models_and_strengths(monkeypatch):
     seen = []
     monkeypatch.setattr(

@@ -74,6 +74,7 @@ if "nodes" not in sys.modules:
     methods = {
         "CheckpointLoaderSimple": "load_checkpoint",
         "CLIPLoader": "load_clip",
+        "ControlNetLoader": "load_controlnet",
         "LoraLoader": "load_lora",
         "UNETLoader": "load_unet",
         "VAELoader": "load_vae",
@@ -85,3 +86,19 @@ if "nodes" not in sys.modules:
             type(class_name, (), {method_name: fake_loader_method}),
         )
     sys.modules["nodes"] = comfy_nodes
+
+
+if "comfy_extras.nodes_upscale_model" not in sys.modules:
+    comfy_extras = types.ModuleType("comfy_extras")
+    comfy_extras.__path__ = []
+    nodes_upscale_model = types.ModuleType("comfy_extras.nodes_upscale_model")
+
+    class UpscaleModelLoader:
+        @classmethod
+        def execute(cls, name):
+            return types.SimpleNamespace(result=None)
+
+    nodes_upscale_model.UpscaleModelLoader = UpscaleModelLoader
+    comfy_extras.nodes_upscale_model = nodes_upscale_model
+    sys.modules["comfy_extras"] = comfy_extras
+    sys.modules["comfy_extras.nodes_upscale_model"] = nodes_upscale_model

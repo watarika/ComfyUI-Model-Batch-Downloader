@@ -1,6 +1,14 @@
 """Companion loaders for assets produced by the batch downloader."""
 
-from nodes import CheckpointLoaderSimple, CLIPLoader, LoraLoader, UNETLoader, VAELoader
+from comfy_extras.nodes_upscale_model import UpscaleModelLoader
+from nodes import (
+    CheckpointLoaderSimple,
+    CLIPLoader,
+    ControlNetLoader,
+    LoraLoader,
+    UNETLoader,
+    VAELoader,
+)
 
 from .aria2_runner import DownloadResult
 
@@ -105,6 +113,47 @@ class ModelBatchDownloaderVAELoader:
         return VAELoader().load_vae(record.relative_path)
 
 
+class ModelBatchDownloaderControlNetLoader:
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "download_result": ("DOWNLOAD_RESULT",),
+                "id": ("STRING", {"default": ""}),
+            }
+        }
+
+    RETURN_TYPES = ("CONTROL_NET",)
+    FUNCTION = "load"
+    CATEGORY = "model/download/loaders"
+
+    def load(self, download_result, id):
+        record = _record(download_result, id, "controlnet")
+        return ControlNetLoader().load_controlnet(record.relative_path)
+
+
+class ModelBatchDownloaderUpscaleModelLoader:
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "download_result": ("DOWNLOAD_RESULT",),
+                "id": ("STRING", {"default": ""}),
+            }
+        }
+
+    RETURN_TYPES = ("UPSCALE_MODEL",)
+    FUNCTION = "load"
+    CATEGORY = "model/download/loaders"
+
+    def load(self, download_result, id):
+        record = _record(download_result, id, "upscale_models")
+        result = UpscaleModelLoader.execute(record.relative_path).result
+        if result is None:
+            raise RuntimeError("UpscaleModelLoader returned NodeOutput without a result")
+        return result
+
+
 class ModelBatchDownloaderLoRALoader:
     @classmethod
     def INPUT_TYPES(cls):
@@ -153,6 +202,8 @@ LOADER_CLASS_MAPPINGS = {
     "ModelBatchDownloaderDiffusionModelLoader": ModelBatchDownloaderDiffusionModelLoader,
     "ModelBatchDownloaderCLIPLoader": ModelBatchDownloaderCLIPLoader,
     "ModelBatchDownloaderVAELoader": ModelBatchDownloaderVAELoader,
+    "ModelBatchDownloaderControlNetLoader": ModelBatchDownloaderControlNetLoader,
+    "ModelBatchDownloaderUpscaleModelLoader": ModelBatchDownloaderUpscaleModelLoader,
     "ModelBatchDownloaderLoRALoader": ModelBatchDownloaderLoRALoader,
 }
 
@@ -161,5 +212,7 @@ LOADER_DISPLAY_NAME_MAPPINGS = {
     "ModelBatchDownloaderDiffusionModelLoader": "Load Diffusion Model (Downloaded)",
     "ModelBatchDownloaderCLIPLoader": "Load CLIP (Downloaded)",
     "ModelBatchDownloaderVAELoader": "Load VAE (Downloaded)",
+    "ModelBatchDownloaderControlNetLoader": "Load ControlNet (Downloaded)",
+    "ModelBatchDownloaderUpscaleModelLoader": "Load Upscale Model (Downloaded)",
     "ModelBatchDownloaderLoRALoader": "Load LoRA (Downloaded)",
 }
