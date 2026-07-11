@@ -5,6 +5,35 @@ import pytest
 from model_batch_downloader.manifest import ManifestError, derive_id, parse_manifest
 
 
+@pytest.mark.parametrize(
+    "model_type",
+    [
+        "controlnet",
+        "embeddings",
+        "upscale_models",
+        "onnx",
+        "sam3",
+        "llm",
+        "ultralytics_bbox",
+        "ultralytics_segm",
+    ],
+)
+def test_parse_manifest_accepts_extended_model_types(model_type):
+    item = parse_manifest(
+        json.dumps([{"url": "https://example.com/model.bin", "model_type": model_type}])
+    )[0]
+    assert item.model_type == model_type
+
+
+def test_parse_manifest_rejects_unknown_model_type():
+    with pytest.raises(ManifestError, match="model_type is unsupported"):
+        parse_manifest(
+            json.dumps(
+                [{"url": "https://example.com/model.bin", "model_type": "unknown"}]
+            )
+        )
+
+
 def test_parse_manifest_applies_defaults():
     items = parse_manifest(
         json.dumps(

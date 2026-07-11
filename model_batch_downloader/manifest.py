@@ -8,7 +8,21 @@ from urllib.parse import urlsplit
 
 
 SUPPORTED_MODEL_TYPES = frozenset(
-    {"checkpoints", "diffusion_models", "text_encoders", "vae", "loras"}
+    {
+        "checkpoints",
+        "diffusion_models",
+        "text_encoders",
+        "vae",
+        "loras",
+        "controlnet",
+        "embeddings",
+        "upscale_models",
+        "onnx",
+        "sam3",
+        "llm",
+        "ultralytics_bbox",
+        "ultralytics_segm",
+    }
 )
 ALLOWED_FIELDS = frozenset({"url", "model_type", "subfolder", "filename", "id", "split"})
 WINDOWS_RESERVED = frozenset(

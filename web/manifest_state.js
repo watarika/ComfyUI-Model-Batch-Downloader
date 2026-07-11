@@ -4,6 +4,14 @@ export const MODEL_TYPES = [
   "text_encoders",
   "vae",
   "loras",
+  "controlnet",
+  "embeddings",
+  "upscale_models",
+  "onnx",
+  "sam3",
+  "llm",
+  "ultralytics_bbox",
+  "ultralytics_segm",
 ];
 
 export function emptyRow() {

@@ -17,6 +17,39 @@ def sample_manifest():
     )
 
 
+def test_roots_preserve_registered_order_and_use_private_defaults(
+    monkeypatch, tmp_path
+):
+    models_dir = tmp_path / "models"
+    first = tmp_path / "first-controlnet"
+    second = tmp_path / "second-controlnet"
+    registered = {
+        "controlnet": ([str(first), str(second)], {".safetensors"}),
+    }
+
+    monkeypatch.setattr(subject.folder_paths, "models_dir", str(models_dir))
+    monkeypatch.setattr(subject.folder_paths, "folder_names_and_paths", registered)
+
+    def get_folder_paths(name):
+        paths, _extensions = registered[name]
+        return paths
+
+    monkeypatch.setattr(subject.folder_paths, "get_folder_paths", get_folder_paths)
+
+    roots = subject._roots()
+
+    assert roots["controlnet"] == (str(first), str(second))
+    assert roots["onnx"] == (str(models_dir / "onnx"),)
+    assert roots["sam3"] == (str(models_dir / "sam3"),)
+    assert roots["llm"] == (str(models_dir / "llm"),)
+    assert roots["ultralytics_bbox"] == (
+        str(models_dir / "ultralytics" / "bbox"),
+    )
+    assert roots["ultralytics_segm"] == (
+        str(models_dir / "ultralytics" / "segm"),
+    )
+
+
 def test_both_nodes_share_executor_and_preserve_identity(monkeypatch):
     sentinel = object()
     result = object()

@@ -8,7 +8,7 @@ import comfy.utils
 import folder_paths
 
 from .aria2_runner import run_downloads
-from .manifest import SUPPORTED_MODEL_TYPES, parse_manifest
+from .manifest import parse_manifest
 from .resolution import probe_filename, resolve_manifest
 
 
@@ -19,13 +19,31 @@ class AnyType(str):
 
 ANY = AnyType("*")
 DOWNLOAD_RESULT = "DOWNLOAD_RESULT"
+_MODEL_ROOTS = {
+    "checkpoints": ("checkpoints",),
+    "diffusion_models": ("diffusion_models",),
+    "text_encoders": ("text_encoders",),
+    "vae": ("vae",),
+    "loras": ("loras",),
+    "controlnet": ("controlnet",),
+    "embeddings": ("embeddings",),
+    "upscale_models": ("upscale_models",),
+    "onnx": ("onnx",),
+    "sam3": ("sam3",),
+    "llm": ("llm",),
+    "ultralytics_bbox": ("ultralytics", "bbox"),
+    "ultralytics_segm": ("ultralytics", "segm"),
+}
 
 
 def _roots() -> dict[str, tuple[str, ...]]:
-    return {
-        name: tuple(folder_paths.get_folder_paths(name))
-        for name in SUPPORTED_MODEL_TYPES
-    }
+    roots = {}
+    for name, relative_path in _MODEL_ROOTS.items():
+        if name in folder_paths.folder_names_and_paths:
+            roots[name] = tuple(folder_paths.get_folder_paths(name))
+        else:
+            roots[name] = (os.path.join(folder_paths.models_dir, *relative_path),)
+    return roots
 
 
 def execute_manifest(

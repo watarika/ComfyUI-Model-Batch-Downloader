@@ -31,7 +31,23 @@ if "comfy" not in sys.modules:
 
 if "folder_paths" not in sys.modules:
     folder_paths = types.ModuleType("folder_paths")
-    folder_paths.get_folder_paths = lambda name: [str(PLUGIN_ROOT / ".test-models" / name)]
+    folder_paths.models_dir = str(PLUGIN_ROOT / ".test-models")
+    folder_paths.folder_names_and_paths = {
+        name: ([str(PLUGIN_ROOT / ".test-models" / name)], set())
+        for name in (
+            "checkpoints",
+            "diffusion_models",
+            "text_encoders",
+            "vae",
+            "loras",
+        )
+    }
+
+    def get_folder_paths(name):
+        paths, _extensions = folder_paths.folder_names_and_paths[name]
+        return paths
+
+    folder_paths.get_folder_paths = get_folder_paths
     sys.modules["folder_paths"] = folder_paths
 
 

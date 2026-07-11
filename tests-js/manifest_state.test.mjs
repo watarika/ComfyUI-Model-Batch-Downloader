@@ -1,12 +1,31 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  MODEL_TYPES,
   addRow,
   emptyRow,
   parseRows,
   removeRow,
   serializeRows,
 } from "../web/manifest_state.js";
+
+test("model types include every supported download category", () => {
+  assert.deepEqual(MODEL_TYPES, [
+    "checkpoints",
+    "diffusion_models",
+    "text_encoders",
+    "vae",
+    "loras",
+    "controlnet",
+    "embeddings",
+    "upscale_models",
+    "onnx",
+    "sam3",
+    "llm",
+    "ultralytics_bbox",
+    "ultralytics_segm",
+  ]);
+});
 
 test("empty row has canonical defaults", () => {
   assert.deepEqual(emptyRow(), {
