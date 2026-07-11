@@ -53,11 +53,11 @@ python main.py
 
 - `Model Download Batch`: 追加・削除ボタンのある一覧UI。内部ではcanonical JSONを保持します。
 - `Model Download Batch (JSON)`: 同じコアを使うJSON直接入力版です。
-- `Downloaded Checkpoint Loader`: Illustriousなどの一体型checkpointをロードします。
-- `Downloaded Diffusion Model Loader`: AnimaやKrea 2のdiffusion modelをロードします。
-- `Downloaded Text Encoder Loader`: Animaでは`auto`、Krea 2では`krea2`を選びます。
-- `Downloaded VAE Loader`: Qwen Image VAEなどをロードします。
-- `Downloaded LoRA Loader`: 対応LoRAをロードします。model-only LoRAでは`strength_clip`を0にできます。
+- `Load Checkpoint (Downloaded)`: Illustriousなどの一体型checkpointをロードします。
+- `Load Diffusion Model (Downloaded)`: AnimaやKrea 2のdiffusion modelをロードします。
+- `Load CLIP (Downloaded)`: ComfyUI標準の`Load CLIP`と同じ`type`の選択肢を使用します。`krea2`、`ideogram4`、`flux2`などを選択できます。
+- `Load VAE (Downloaded)`: Qwen Image VAEなどをロードします。
+- `Load LoRA (Downloaded)`: 対応LoRAをロードします。model-only LoRAでは`strength_clip`を0にできます。
 
 2種類のdownload nodeは、任意型の`passthrough`を入力と出力に持ちます。既存の接続途中に挿入できるほか、未接続でもoutput nodeとして実行できます。取得結果を使う場合は`download_result`を対応するDownloaded Loaderへ接続し、manifestの`id`を指定します。
 

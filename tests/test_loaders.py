@@ -2,6 +2,17 @@ from model_batch_downloader.aria2_runner import DownloadRecord, DownloadResult
 import model_batch_downloader.loaders as subject
 
 
+subject.CLIPLoader.INPUT_TYPES = classmethod(
+    lambda cls: {
+        "required": {
+            "clip_name": (["model.safetensors"],),
+            "type": (["stable_diffusion", "krea2", "ideogram4", "flux2"],),
+        },
+        "optional": {"device": (["default", "cpu"], {"advanced": True})},
+    }
+)
+
+
 def result(model_type, relative_path="folder/model.safetensors", item_id="asset"):
     return DownloadResult(
         {
@@ -44,20 +55,26 @@ def test_diffusion_loader_passes_weight_dtype(monkeypatch):
     assert seen == [("folder/model.safetensors", "fp8_e4m3fn")]
 
 
-def test_text_encoder_maps_auto_and_krea2(monkeypatch):
+def test_clip_loader_reuses_standard_type_and_device_inputs():
+    standard = subject.CLIPLoader.INPUT_TYPES()
+    custom = subject.ModelBatchDownloaderCLIPLoader.INPUT_TYPES()
+    assert custom["required"]["type"] == standard["required"]["type"]
+    assert custom["optional"]["device"] == standard["optional"]["device"]
+    assert "auto" not in custom["required"]["type"][0]
+
+
+def test_clip_loader_delegates_type_and_device(monkeypatch):
     seen = []
     monkeypatch.setattr(
         subject.CLIPLoader,
         "load_clip",
         lambda self, name, type, device: seen.append((name, type, device)) or ("clip",),
     )
-    loader = subject.ModelBatchDownloaderTextEncoderLoader()
-    loader.load(result("text_encoders"), "asset", "auto", "default")
-    loader.load(result("text_encoders"), "asset", "krea2", "cpu")
-    assert seen == [
-        ("folder/model.safetensors", "stable_diffusion", "default"),
-        ("folder/model.safetensors", "krea2", "cpu"),
-    ]
+    output = subject.ModelBatchDownloaderCLIPLoader().load(
+        result("text_encoders"), "asset", "ideogram4", "cpu"
+    )
+    assert output == ("clip",)
+    assert seen == [("folder/model.safetensors", "ideogram4", "cpu")]
 
 
 def test_wrong_category_fails_before_delegation():

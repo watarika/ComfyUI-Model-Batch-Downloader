@@ -17,11 +17,22 @@ def test_plugin_registers_seven_namespaced_nodes():
 
     assert sorted(module.NODE_CLASS_MAPPINGS) == [
         "ModelBatchDownloader",
+        "ModelBatchDownloaderCLIPLoader",
         "ModelBatchDownloaderCheckpointLoader",
         "ModelBatchDownloaderDiffusionModelLoader",
         "ModelBatchDownloaderJSON",
         "ModelBatchDownloaderLoRALoader",
-        "ModelBatchDownloaderTextEncoderLoader",
         "ModelBatchDownloaderVAELoader",
     ]
+    assert "ModelBatchDownloaderCLIPLoader" in module.NODE_CLASS_MAPPINGS
+    assert "ModelBatchDownloaderTextEncoderLoader" not in module.NODE_CLASS_MAPPINGS
+    assert module.NODE_DISPLAY_NAME_MAPPINGS == {
+        "ModelBatchDownloader": "Model Download Batch",
+        "ModelBatchDownloaderJSON": "Model Download Batch (JSON)",
+        "ModelBatchDownloaderCheckpointLoader": "Load Checkpoint (Downloaded)",
+        "ModelBatchDownloaderDiffusionModelLoader": "Load Diffusion Model (Downloaded)",
+        "ModelBatchDownloaderCLIPLoader": "Load CLIP (Downloaded)",
+        "ModelBatchDownloaderVAELoader": "Load VAE (Downloaded)",
+        "ModelBatchDownloaderLoRALoader": "Load LoRA (Downloaded)",
+    }
     assert module.WEB_DIRECTORY == "./web"

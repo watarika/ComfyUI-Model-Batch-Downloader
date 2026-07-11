@@ -62,17 +62,18 @@ class ModelBatchDownloaderDiffusionModelLoader:
         return UNETLoader().load_unet(record.relative_path, weight_dtype)
 
 
-class ModelBatchDownloaderTextEncoderLoader:
+class ModelBatchDownloaderCLIPLoader:
     @classmethod
     def INPUT_TYPES(cls):
+        standard = CLIPLoader.INPUT_TYPES()
         return {
             "required": {
                 "download_result": ("DOWNLOAD_RESULT",),
                 "id": ("STRING", {"default": ""}),
-                "type": (["auto", "krea2"],),
+                "type": standard["required"]["type"],
             },
             "optional": {
-                "device": (["default", "cpu"], {"advanced": True}),
+                "device": standard["optional"]["device"],
             },
         }
 
@@ -82,8 +83,7 @@ class ModelBatchDownloaderTextEncoderLoader:
 
     def load(self, download_result, id, type, device="default"):
         record = _record(download_result, id, "text_encoders")
-        clip_type = "stable_diffusion" if type == "auto" else type
-        return CLIPLoader().load_clip(record.relative_path, clip_type, device)
+        return CLIPLoader().load_clip(record.relative_path, type, device)
 
 
 class ModelBatchDownloaderVAELoader:
@@ -151,15 +151,15 @@ class ModelBatchDownloaderLoRALoader:
 LOADER_CLASS_MAPPINGS = {
     "ModelBatchDownloaderCheckpointLoader": ModelBatchDownloaderCheckpointLoader,
     "ModelBatchDownloaderDiffusionModelLoader": ModelBatchDownloaderDiffusionModelLoader,
-    "ModelBatchDownloaderTextEncoderLoader": ModelBatchDownloaderTextEncoderLoader,
+    "ModelBatchDownloaderCLIPLoader": ModelBatchDownloaderCLIPLoader,
     "ModelBatchDownloaderVAELoader": ModelBatchDownloaderVAELoader,
     "ModelBatchDownloaderLoRALoader": ModelBatchDownloaderLoRALoader,
 }
 
 LOADER_DISPLAY_NAME_MAPPINGS = {
-    "ModelBatchDownloaderCheckpointLoader": "Downloaded Checkpoint Loader",
-    "ModelBatchDownloaderDiffusionModelLoader": "Downloaded Diffusion Model Loader",
-    "ModelBatchDownloaderTextEncoderLoader": "Downloaded Text Encoder Loader",
-    "ModelBatchDownloaderVAELoader": "Downloaded VAE Loader",
-    "ModelBatchDownloaderLoRALoader": "Downloaded LoRA Loader",
+    "ModelBatchDownloaderCheckpointLoader": "Load Checkpoint (Downloaded)",
+    "ModelBatchDownloaderDiffusionModelLoader": "Load Diffusion Model (Downloaded)",
+    "ModelBatchDownloaderCLIPLoader": "Load CLIP (Downloaded)",
+    "ModelBatchDownloaderVAELoader": "Load VAE (Downloaded)",
+    "ModelBatchDownloaderLoRALoader": "Load LoRA (Downloaded)",
 }
