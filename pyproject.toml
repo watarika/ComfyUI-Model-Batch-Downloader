@@ -1,8 +1,18 @@
 [project]
 name = "comfyui-model-batch-downloader"
+description = "Download and load multiple ComfyUI model files from Hugging Face, Civitai, and HTTP URLs."
 version = "0.1.0"
 requires-python = ">=3.10"
+license = { file = "LICENSE" }
 dependencies = []
+
+[project.urls]
+Repository = "https://github.com/watarika/ComfyUI-Model-Batch-Downloader"
+
+[tool.comfy]
+PublisherId = "watarika"
+DisplayName = "ComfyUI Model Batch Downloader"
+Icon = ""
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
