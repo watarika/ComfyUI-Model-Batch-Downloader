@@ -5,7 +5,7 @@ from email.message import Message
 import os
 from pathlib import Path
 from urllib.parse import unquote, urlsplit
-from urllib.request import Request, urlopen
+from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 from .manifest import (
     ManifestError,
@@ -14,20 +14,34 @@ from .manifest import (
     derive_id,
     validate_filename,
 )
-from .security import auth_for_url, authenticated_url, redact
+from .security import auth_for_url, redact, resolve_download_source
+
+
+def _origin(url: str) -> tuple[str, str, int | None]:
+    parsed = urlsplit(url)
+    return parsed.scheme.lower(), (parsed.hostname or "").lower(), parsed.port
+
+
+class _SafeRedirectHandler(HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        redirected = super().redirect_request(req, fp, code, msg, headers, newurl)
+        if redirected is not None and _origin(req.full_url) != _origin(newurl):
+            redirected.remove_header("Authorization")
+        return redirected
 
 
 def probe_filename(url: str, headers: Mapping[str, str]) -> str:
+    opener = build_opener(_SafeRedirectHandler)
     request = Request(url, headers=dict(headers), method="HEAD")
     try:
-        response = urlopen(request, timeout=20)
+        response = opener.open(request, timeout=20)
     except Exception:
         request = Request(
             url,
             headers={**dict(headers), "Range": "bytes=0-0"},
             method="GET",
         )
-        response = urlopen(request, timeout=20)
+        response = opener.open(request, timeout=20)
 
     with response:
         disposition = response.headers.get("Content-Disposition")
@@ -75,11 +89,12 @@ def resolve_manifest(
             )
 
         auth = auth_for_url(item.url, environment)
-        headers = {auth.header[0]: auth.header[1]} if auth.header else {}
         try:
-            filename = item.filename or probe(
-                authenticated_url(item.url, auth), headers
-            )
+            if item.filename:
+                filename = item.filename
+            else:
+                source = resolve_download_source(item.url, auth)
+                filename = probe(source.url, source.headers)
         except Exception as exception:
             raise ManifestError(
                 f"item {index} filename resolution failed: "

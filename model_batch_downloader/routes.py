@@ -10,7 +10,7 @@ from server import PromptServer
 
 from .manifest import derive_id
 from .resolution import probe_filename
-from .security import auth_for_url, authenticated_url, redact
+from .security import auth_for_url, redact, resolve_download_source
 
 
 @PromptServer.instance.routes.post("/model-batch-downloader/resolve")
@@ -26,12 +26,12 @@ async def resolve_download_name(request: web.Request) -> web.Response:
         return web.json_response({"error": "url must be a string"}, status=400)
 
     auth = auth_for_url(url, os.environ)
-    headers = dict([auth.header]) if auth.header else {}
     try:
+        source = await asyncio.to_thread(resolve_download_source, url, auth)
         filename = await asyncio.to_thread(
             probe_filename,
-            authenticated_url(url, auth),
-            headers,
+            source.url,
+            source.headers,
         )
     except Exception as exc:
         return web.json_response(

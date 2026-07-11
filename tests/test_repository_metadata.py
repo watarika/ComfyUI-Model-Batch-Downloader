@@ -15,7 +15,7 @@ def test_pyproject_contains_publication_metadata():
         "Download and load multiple ComfyUI model files from Hugging Face, "
         "Civitai, and HTTP URLs."
     )
-    assert project["version"] == "0.2.1"
+    assert project["version"] == "0.2.2"
     assert project["requires-python"] == ">=3.10"
     assert project["license"] == {"file": "LICENSE"}
     assert project["dependencies"] == []
@@ -112,6 +112,15 @@ def test_readmes_are_bilingual_and_cover_the_same_topics():
     for english_heading, japanese_heading in section_pairs:
         assert english_heading in english
         assert japanese_heading in japanese
+
+    assert "`civitai.red` is recommended" in english
+    assert "`civitai.com` download URLs are deprecated" in english
+    assert "may fail with HTTP 403" in english
+    assert "https://civitai.red/api/download/models/{modelVersionId}" in english
+    assert "`civitai.red`を推奨" in japanese
+    assert "`civitai.com`のダウンロードURLは非推奨" in japanese
+    assert "HTTP 403になる可能性があります" in japanese
+    assert "https://civitai.red/api/download/models/{modelVersionId}" in japanese
 
 
 def test_maintainer_information_lives_only_in_contributing():

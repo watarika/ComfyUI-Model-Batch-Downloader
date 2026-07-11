@@ -5,8 +5,10 @@ from threading import Thread
 
 import pytest
 
+import model_batch_downloader.aria2_runner as subject
 from model_batch_downloader.aria2_runner import BatchDownloadError, run_downloads
 from model_batch_downloader.manifest import ResolvedItem
+from model_batch_downloader.security import CIVITAI_USER_AGENT, DownloadSource
 
 
 class FakeProcess:
@@ -104,12 +106,25 @@ def test_partial_sidecar_marks_success_as_resumed_and_deletes_control_file(tmp_p
     assert not seen["control_path"].exists()
 
 
-def test_new_civitai_download_puts_token_only_in_control_file(tmp_path):
+def test_new_civitai_red_download_puts_bearer_only_in_control_file(
+    tmp_path, monkeypatch
+):
     resolved = make_item(
         tmp_path,
-        url="https://civitai.com/api/download/models/42?format=SafeTensor",
+        url="https://civitai.red/api/download/models/42?format=SafeTensor",
     )
     seen = {}
+    monkeypatch.setattr(
+        subject,
+        "resolve_download_source",
+        lambda url, _auth: DownloadSource(
+            url,
+            {
+                "Authorization": "Bearer cv_secret",
+                "User-Agent": CIVITAI_USER_AGENT,
+            },
+        ),
+    )
 
     def fake_start(command, **_kwargs):
         seen["command"] = command
@@ -127,7 +142,9 @@ def test_new_civitai_download_puts_token_only_in_control_file(tmp_path):
 
     assert result.entries["model"].status == "downloaded"
     assert "cv_secret" not in " ".join(seen["command"])
-    assert "format=SafeTensor&token=cv_secret" in seen["control"]
+    assert "https://civitai.red/api/download/models/42?format=SafeTensor" in seen["control"]
+    assert "token=" not in seen["control"]
+    assert "header=Authorization: Bearer cv_secret" in seen["control"]
     assert (
         "user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
         "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3"

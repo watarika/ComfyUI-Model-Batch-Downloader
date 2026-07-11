@@ -15,14 +15,10 @@ from urllib.parse import urlsplit
 
 from .manifest import ResolvedItem
 from .progress import format_bytes, parse_aria2_progress
-from .security import auth_for_url, authenticated_url, redact
+from .security import auth_for_url, redact, resolve_download_source
 
 
 logger = logging.getLogger(__name__)
-_CIVITAI_USER_AGENT = (
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-    "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3"
-)
 _STREAM_END = object()
 _STREAM_QUEUE_SIZE = 40
 
@@ -72,9 +68,9 @@ def _control_text(
     item: ResolvedItem, environ: Mapping[str, str]
 ) -> tuple[str, tuple[str, ...]]:
     auth = auth_for_url(item.url, environ)
-    source_url = authenticated_url(item.url, auth)
+    source = resolve_download_source(item.url, auth)
     lines = [
-        source_url,
+        source.url,
         f"  dir={item.destination.parent}",
         f"  out={item.destination.name}",
         "  continue=true",
@@ -83,10 +79,11 @@ def _control_text(
         f"  split={item.split}",
         f"  max-connection-per-server={item.split}",
     ]
-    if auth.provider == "civitai":
-        lines.append(f"  user-agent={_CIVITAI_USER_AGENT}")
-    if auth.header:
-        lines.append(f"  header={auth.header[0]}: {auth.header[1]}")
+    for name, value in source.headers.items():
+        if name.lower() == "user-agent":
+            lines.append(f"  user-agent={value}")
+        else:
+            lines.append(f"  header={name}: {value}")
     return "\n".join(lines) + "\n", auth.secrets
 
 

@@ -2,6 +2,7 @@ import asyncio
 import json
 
 import model_batch_downloader.routes as subject
+from model_batch_downloader.security import CIVITAI_USER_AGENT, DownloadSource
 
 
 class Request:
@@ -21,6 +22,17 @@ def test_preview_returns_resolved_filename_and_id(monkeypatch):
         return "model.fp16.safetensors"
 
     monkeypatch.setattr(subject, "probe_filename", fake_probe)
+    monkeypatch.setattr(
+        subject,
+        "resolve_download_source",
+        lambda url, _auth: DownloadSource(
+            url,
+            {
+                "Authorization": "Bearer cv_secret",
+                "User-Agent": CIVITAI_USER_AGENT,
+            },
+        ),
+    )
     monkeypatch.setenv("CIVITAI_API_TOKEN", "cv_secret")
 
     response = asyncio.run(
@@ -32,8 +44,11 @@ def test_preview_returns_resolved_filename_and_id(monkeypatch):
 
     assert response.status == 200
     assert payload == {"filename": "model.fp16.safetensors", "id": "model.fp16"}
-    assert seen["url"].endswith("?token=cv_secret")
-    assert seen["headers"] == {}
+    assert seen["url"] == "https://civitai.com/api/download/models/42"
+    assert seen["headers"] == {
+        "Authorization": "Bearer cv_secret",
+        "User-Agent": CIVITAI_USER_AGENT,
+    }
 
 
 def test_preview_rejects_non_string_url():
@@ -43,10 +58,21 @@ def test_preview_rejects_non_string_url():
 
 
 def test_preview_redacts_token_from_failure(monkeypatch):
-    def fake_probe(url, _headers):
-        raise RuntimeError(f"failed: {url}")
+    def fake_probe(url, headers):
+        raise RuntimeError(f"failed: {url} headers={headers}")
 
     monkeypatch.setattr(subject, "probe_filename", fake_probe)
+    monkeypatch.setattr(
+        subject,
+        "resolve_download_source",
+        lambda url, _auth: DownloadSource(
+            url,
+            {
+                "Authorization": "Bearer cv_secret",
+                "User-Agent": CIVITAI_USER_AGENT,
+            },
+        ),
+    )
     monkeypatch.setenv("CIVITAI_API_TOKEN", "cv_secret")
 
     response = asyncio.run(

@@ -1,10 +1,17 @@
 from pathlib import Path
+from urllib.request import Request
 
 import pytest
 
+import model_batch_downloader.resolution as resolution
+import model_batch_downloader.security as security
 from model_batch_downloader.manifest import ManifestError, ManifestItem
 from model_batch_downloader.resolution import resolve_manifest
-from model_batch_downloader.security import auth_for_url, authenticated_url, redact
+from model_batch_downloader.security import (
+    auth_for_url,
+    provider_for_url,
+    redact,
+)
 
 
 def test_resolve_uses_content_disposition_and_derives_id(tmp_path):
@@ -104,27 +111,149 @@ def test_resolve_rejects_secondary_root_symlink_escape(tmp_path):
         )
 
 
-def test_auth_uses_environment_only():
+@pytest.mark.parametrize("domain", ("civitai.com", "civitai.red"))
+def test_auth_uses_environment_only(domain):
     huggingface = auth_for_url(
         "https://huggingface.co/a/b", {"HF_TOKEN": "hf_secret"}
     )
     assert huggingface.header == ("Authorization", "Bearer hf_secret")
 
     civitai = auth_for_url(
-        "https://civitai.com/api/download/models/1",
+        f"https://{domain}/api/download/models/1",
         {"CIVITAI_API_TOKEN": "cv_secret"},
     )
-    assert civitai.query_token == "cv_secret"
-    assert authenticated_url(
-        "https://civitai.com/api/download/models/1?format=SafeTensor", civitai
-    ).endswith("format=SafeTensor&token=cv_secret")
+    assert provider_for_url(f"https://{domain}/api/download/models/1") == "civitai"
+    assert civitai.header == ("Authorization", "Bearer cv_secret")
 
 
 def test_public_host_has_no_authentication():
     auth = auth_for_url("https://example.com/model.safetensors", {})
     assert auth.provider == "public"
     assert auth.header is None
-    assert auth.query_token is None
+
+
+def test_civitai_cross_origin_redirect_drops_bearer_header():
+    assert hasattr(security, "resolve_download_source")
+    requests = []
+
+    class Response:
+        status = 307
+        headers = {"Location": "https://b2.civitai.com/file/model?signature=signed"}
+
+        def close(self):
+            pass
+
+    def open_request(request):
+        requests.append(request)
+        return Response()
+
+    auth = auth_for_url(
+        "https://civitai.red/api/download/models/42",
+        {"CIVITAI_API_TOKEN": "cv_secret"},
+    )
+    source = security.resolve_download_source(
+        "https://civitai.red/api/download/models/42",
+        auth,
+        open_request=open_request,
+    )
+
+    assert source.url == "https://b2.civitai.com/file/model?signature=signed"
+    assert source.headers == {"User-Agent": security.CIVITAI_USER_AGENT}
+    assert requests[0].get_header("Authorization") == "Bearer cv_secret"
+    assert requests[0].get_header("User-agent") == security.CIVITAI_USER_AGENT
+
+
+def test_civitai_direct_response_keeps_bearer_for_aria2():
+    assert hasattr(security, "resolve_download_source")
+    class Response:
+        status = 200
+        headers = {}
+
+        def close(self):
+            pass
+
+    auth = auth_for_url(
+        "https://civitai.red/api/download/models/42",
+        {"CIVITAI_API_TOKEN": "cv_secret"},
+    )
+    source = security.resolve_download_source(
+        "https://civitai.red/api/download/models/42",
+        auth,
+        open_request=lambda _request: Response(),
+    )
+
+    assert source.url == "https://civitai.red/api/download/models/42"
+    assert source.headers == {
+        "Authorization": "Bearer cv_secret",
+        "User-Agent": security.CIVITAI_USER_AGENT,
+    }
+
+
+def test_civitai_redirect_rejects_https_downgrade():
+    class Response:
+        status = 307
+        headers = {"Location": "http://civitai.red/file/model"}
+
+        def close(self):
+            pass
+
+    auth = auth_for_url(
+        "https://civitai.red/api/download/models/42",
+        {"CIVITAI_API_TOKEN": "cv_secret"},
+    )
+
+    with pytest.raises(RuntimeError, match="HTTPS"):
+        security.resolve_download_source(
+            "https://civitai.red/api/download/models/42",
+            auth,
+            open_request=lambda _request: Response(),
+        )
+
+
+def test_civitai_redirect_to_nonstandard_port_drops_bearer():
+    class Response:
+        status = 307
+        headers = {"Location": "https://civitai.red:8443/file/model"}
+
+        def close(self):
+            pass
+
+    auth = auth_for_url(
+        "https://civitai.red/api/download/models/42",
+        {"CIVITAI_API_TOKEN": "cv_secret"},
+    )
+    source = security.resolve_download_source(
+        "https://civitai.red/api/download/models/42",
+        auth,
+        open_request=lambda _request: Response(),
+    )
+
+    assert source.url == "https://civitai.red:8443/file/model"
+    assert source.headers == {"User-Agent": security.CIVITAI_USER_AGENT}
+
+
+def test_probe_redirect_drops_bearer_outside_original_origin():
+    assert hasattr(resolution, "_SafeRedirectHandler")
+    handler = resolution._SafeRedirectHandler()
+    original = Request(
+        "https://civitai.red/api/download/models/42",
+        headers={
+            "Authorization": "Bearer cv_secret",
+            "User-Agent": security.CIVITAI_USER_AGENT,
+        },
+    )
+
+    redirected = handler.redirect_request(
+        original,
+        None,
+        307,
+        "Temporary Redirect",
+        {},
+        "https://b2.civitai.com/file/model?signature=signed",
+    )
+
+    assert redirected.get_header("Authorization") is None
+    assert redirected.get_header("User-agent") == security.CIVITAI_USER_AGENT
 
 
 def test_redact_removes_exact_and_pattern_secrets():
@@ -173,8 +302,8 @@ def test_resolution_error_redacts_civitai_token(tmp_path):
         "https://civitai.com/api/download/models/42", "checkpoints"
     )
 
-    def failing_probe(url, _headers):
-        raise RuntimeError(f"failed request: {url}")
+    def failing_probe(url, headers):
+        raise RuntimeError(f"failed request: {url} headers={headers}")
 
     with pytest.raises(ManifestError) as captured:
         resolve_manifest(

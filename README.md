@@ -51,6 +51,8 @@ python main.py
 
 Tokens are sent only to the corresponding domains and are not stored in the manifest, `DOWNLOAD_RESULT`, or UI state.
 
+For Civitai download URLs, `civitai.red` is recommended. Use `https://civitai.red/api/download/models/{modelVersionId}`. `civitai.com` download URLs are deprecated for this custom node and may fail with HTTP 403, especially for restricted or NSFW files.
+
 ## Nodes
 
 - `Model Download Batch`: A list UI with add and remove buttons. It stores canonical JSON internally.
@@ -118,6 +120,19 @@ Without `subfolder`, each category uses the following directory. A configured Co
 
 Embedding files are used through prompt references and have no companion loader. `comfyui-sam3` consumes a path string through its path-based `(down)Load SAM3 Model`; its default `models/sam3/sam3.pt` points to this downloader's default SAM3 destination, but this downloader does not provide a SAM3 companion loader. For LLM files, `ComfyUI_LLM_SDXL_Adapter` reads `models/llm` through `LLM Model Loader` and `LLM GGUF Model Loader`. LLM support covers single-file downloads only; it does not automatically provide repository snapshots or multi-file inference. Impact Pack, `comfyui-sam3`, `ComfyUI_LLM_SDXL_Adapter`, Impact Subpack, and other optional custom nodes are not dependencies of this downloader; install and use them separately when you need their consumer nodes.
 
+A Civitai LoRA example using the recommended domain:
+
+```json
+[
+  {
+    "url": "https://civitai.red/api/download/models/{modelVersionId}",
+    "model_type": "loras",
+    "id": "civitai_lora",
+    "filename": "civitai_lora.safetensors"
+  }
+]
+```
+
 A concrete usage example for Anima:
 
 ```json
@@ -159,7 +174,7 @@ If a URL resolves to `model.fp16.safetensors` and `id` is omitted, the ID is `mo
 
 - `aria2c is required`: Confirm that `aria2c --version` works in the same environment as ComfyUI, then restart ComfyUI.
 - Hugging Face 401/403: Check `HF_TOKEN` and your repository access permissions.
-- Civitai 401/403: Check `CIVITAI_API_TOKEN`.
+- Civitai 401/403: Use the recommended `civitai.red` download URL and check `CIVITAI_API_TOKEN`. A `civitai.com` URL may fail even when the token is valid.
 - `duplicate id`: Assign a unique explicit `id` to one of the entries.
 - category mismatch: Connect to the Downloaded Loader corresponding to the ID's `model_type`.
 - No loader for an extended category: Use the consumer shown in the compatibility table. External consumer plugins are independently installed and maintained; this downloader only owns downloading the file to the selected destination.
