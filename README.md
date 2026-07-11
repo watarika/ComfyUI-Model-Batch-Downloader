@@ -1,37 +1,39 @@
 # ComfyUI Model Batch Downloader
 
-Hugging Face、Civitai、通常のHTTP URLから複数のモデルファイルを`aria2c`で取得し、同じComfyUIキュー内でロードするカスタムノードです。Illustrious、Anima、Krea 2で使うチェックポイント、diffusion model、text encoder、VAE、LoRAを対象にしています。
+[English] [<a href="README_ja.md">日本語</a>]
 
-既存ファイルは上書きせず、チェックサム検証も行いません。`.aria2`サイドカーがある未完了ファイルは継続ダウンロードします。
+This custom node downloads multiple model files from Hugging Face, Civitai, and regular HTTP URLs with `aria2c`, then loads them within the same ComfyUI queue. It supports checkpoints, diffusion models, text encoders, VAEs, and LoRAs used with Illustrious, Anima, and Krea 2.
 
-## 必要なもの
+Existing files are not overwritten, and checksums are not verified. Incomplete files with an `.aria2` sidecar are resumed.
+
+## Requirements
 
 - ComfyUI
-- Python 3.10以上
-- `aria2c`コマンド（ComfyUIを起動する環境の`PATH`から実行できること）
+- Python 3.10 or later
+- The `aria2c` command, available on the `PATH` of the environment that starts ComfyUI
 
-`aria2c`はこのリポジトリには同梱せず、自動インストールもしません。
+`aria2c` is not bundled with this repository and is not installed automatically.
 
-## インストール
+## Installation
 
-ComfyUIのディレクトリで実行します。
+Run this from the ComfyUI directory.
 
 ```powershell
-git clone <repository-url> custom_nodes/ComfyUI-Model-Batch-Downloader
+git clone https://github.com/watarika/ComfyUI-Model-Batch-Downloader.git custom_nodes/ComfyUI-Model-Batch-Downloader
 ```
 
-その後、ComfyUIを再起動してください。追加のPythonパッケージはありません。
+Then restart ComfyUI. No additional Python packages are required.
 
-## 認証
+## Authentication
 
-トークンはノードやワークフローJSONに入力せず、ComfyUIを起動するプロセスの環境変数に設定します。
+Do not enter tokens in nodes or workflow JSON. Set them as environment variables for the process that starts ComfyUI.
 
-| サービス | 環境変数 |
+| Service | Environment variable |
 |---|---|
 | Hugging Face | `HF_TOKEN` |
 | Civitai | `CIVITAI_API_TOKEN` |
 
-PowerShellの例:
+PowerShell example:
 
 ```powershell
 $env:HF_TOKEN = "hf_..."
@@ -39,7 +41,7 @@ $env:CIVITAI_API_TOKEN = "..."
 python main.py
 ```
 
-Linuxの例:
+Linux example:
 
 ```bash
 export HF_TOKEN='hf_...'
@@ -47,46 +49,46 @@ export CIVITAI_API_TOKEN='...'
 python main.py
 ```
 
-トークンは対応ドメインにだけ付与され、manifest、`DOWNLOAD_RESULT`、画面の状態には保存されません。
+Tokens are sent only to the corresponding domains and are not stored in the manifest, `DOWNLOAD_RESULT`, or UI state.
 
-## ノード
+## Nodes
 
-- `Model Download Batch`: 追加・削除ボタンのある一覧UI。内部ではcanonical JSONを保持します。
-- `Model Download Batch (JSON)`: 同じコアを使うJSON直接入力版です。
-- `Load Checkpoint (Downloaded)`: Illustriousなどの一体型checkpointをロードします。
-- `Load Diffusion Model (Downloaded)`: AnimaやKrea 2のdiffusion modelをロードします。
-- `Load CLIP (Downloaded)`: ComfyUI標準の`Load CLIP`と同じ`type`の選択肢を使用します。`krea2`、`ideogram4`、`flux2`などを選択できます。
-- `Load VAE (Downloaded)`: Qwen Image VAEなどをロードします。
-- `Load LoRA (Downloaded)`: 対応LoRAをロードします。model-only LoRAでは`strength_clip`を0にできます。
+- `Model Download Batch`: A list UI with add and remove buttons. It stores canonical JSON internally.
+- `Model Download Batch (JSON)`: A direct JSON-input version using the same core.
+- `Load Checkpoint (Downloaded)`: Loads all-in-one checkpoints such as Illustrious.
+- `Load Diffusion Model (Downloaded)`: Loads diffusion models for Anima and Krea 2.
+- `Load CLIP (Downloaded)`: Uses the same `type` choices as ComfyUI's standard `Load CLIP`, including `krea2`, `ideogram4`, and `flux2`.
+- `Load VAE (Downloaded)`: Loads VAEs such as Qwen Image VAE.
+- `Load LoRA (Downloaded)`: Loads compatible LoRAs. For model-only LoRAs, `strength_clip` can be set to 0.
 
-2種類のdownload nodeは、任意型の`passthrough`を入力と出力に持ちます。既存の接続途中に挿入できるほか、未接続でもoutput nodeとして実行できます。取得結果を使う場合は`download_result`を対応するDownloaded Loaderへ接続し、manifestの`id`を指定します。
+Both download nodes have an arbitrary-type `passthrough` input and output. They can be inserted into an existing connection or run unconnected as output nodes. To use downloaded results, connect `download_result` to the corresponding Downloaded Loader and specify the manifest `id`.
 
-## ダウンロード進捗
+## Download progress
 
-実行中のdownload nodeには、KSamplerと同じComfyUI標準の進捗バーが表示されます。複数ファイルの場合もバーはリセットせず、バッチ全体を0～100%として進みます。
+While a download node is running, it displays ComfyUI's standard progress bar, the same one used by KSampler. With multiple files, the bar does not reset; it advances from 0 to 100% across the entire batch.
 
-ComfyUIのログには約1秒ごとに現在のID、進捗率、速度、ETAを表示します。
+Approximately once per second, the ComfyUI log shows the current ID, percentage, speed, and ETA.
 
 ```text
 [Model Batch Downloader] anima_model 42%  18.3MiB  ETA 31s
 ```
 
-認証トークンと認証済みURLはログへ出力しません。
+Authentication tokens and authenticated URLs are never written to the log.
 
 ## Manifest
 
-ルートは1件以上のJSON配列です。各項目で使えるフィールドは次のとおりです。
+The root is a JSON array containing at least one item. Each item supports these fields:
 
-| フィールド | 必須 | 内容 |
+| Field | Required | Description |
 |---|---:|---|
-| `url` | はい | HTTP/HTTPS URL |
-| `model_type` | はい | `checkpoints`, `diffusion_models`, `text_encoders`, `vae`, `loras` |
-| `subfolder` | いいえ | 対応するComfyUI model root配下の保存先 |
-| `filename` | いいえ | 省略時はレスポンスまたはURLから解決 |
-| `id` | いいえ | 省略時はfilenameの最後の拡張子を除いた値 |
-| `split` | いいえ | 1～16、既定値16 |
+| `url` | Yes | HTTP/HTTPS URL |
+| `model_type` | Yes | `checkpoints`, `diffusion_models`, `text_encoders`, `vae`, `loras` |
+| `subfolder` | No | Destination under the corresponding ComfyUI model root |
+| `filename` | No | If omitted, resolved from the response or URL |
+| `id` | No | If omitted, the filename without its final extension |
+| `split` | No | 1–16; default 16 |
 
-Anima向けの例:
+Example for Anima:
 
 ```json
 [
@@ -111,27 +113,31 @@ Anima向けの例:
 ]
 ```
 
-`download_result`を3つの対応loaderへ接続し、それぞれ`anima_model`、`anima_encoder`、`qwen_vae`を指定します。
+Connect `download_result` to the three corresponding loaders and specify `anima_model`, `anima_encoder`, and `qwen_vae`, respectively.
 
-URLが`model.fp16.safetensors`へ解決され、`id`が省略されていればIDは`model.fp16`です。URL末尾からfilenameを判断できないCivitai APIなどでは、一覧UIの`Resolve filename / ID`で事前解決できます。JSON版で安定して参照したい場合は明示的な`id`を推奨します。
+If a URL resolves to `model.fp16.safetensors` and `id` is omitted, the ID is `model.fp16`. For sources such as the Civitai API where the filename cannot be determined from the URL suffix, use `Resolve filename / ID` in the list UI to resolve it in advance. An explicit `id` is recommended for stable references in the JSON version.
 
-## 既存ファイルとエラー
+## Existing files and errors
 
-- 完成済みファイルがあれば、aria2を起動せず`skipped`にします。
-- `<filename>.aria2`があればaria2の継続モードで再開します。
-- 複数項目は順番に処理し、1件が失敗しても残りを試します。最後に失敗をまとめて報告します。
-- 保存先はComfyUIが設定している各model rootの配下だけに制限されます。
-- 同じIDや同じ保存先がmanifest内で重複するとエラーになります。
+- If a completed file exists, it is marked `skipped` without starting aria2.
+- If `<filename>.aria2` exists, the download resumes in aria2 continuation mode.
+- Multiple items are processed in order. If one fails, the remaining items are still attempted, and failures are reported together at the end.
+- Destinations are restricted to the configured ComfyUI model roots.
+- Duplicate IDs or destinations within a manifest are errors.
 
-## トラブルシューティング
+## Troubleshooting
 
-- `aria2c is required`: `aria2c --version`がComfyUIと同じ環境で通るか確認し、ComfyUIを再起動してください。
-- Hugging Faceで401/403: `HF_TOKEN`とリポジトリへのアクセス権を確認してください。
-- Civitaiで401/403: `CIVITAI_API_TOKEN`を確認してください。
-- `duplicate id`: どちらかに一意の`id`を明示してください。
-- category mismatch: IDの`model_type`に対応するDownloaded Loaderへ接続してください。
+- `aria2c is required`: Confirm that `aria2c --version` works in the same environment as ComfyUI, then restart ComfyUI.
+- Hugging Face 401/403: Check `HF_TOKEN` and your repository access permissions.
+- Civitai 401/403: Check `CIVITAI_API_TOKEN`.
+- `duplicate id`: Assign a unique explicit `id` to one of the entries.
+- category mismatch: Connect to the Downloaded Loader corresponding to the ID's `model_type`.
 
-## 開発時の確認
+## Comfy Registry publishing
+
+The Publisher ID is `watarika`. The GitHub Secret `REGISTRY_ACCESS_TOKEN` must contain the Comfy Registry API key. Publishing can be started manually, and also runs when `pyproject.toml` changes on `main`.
+
+## Development
 
 ```powershell
 uv run --with pytest --with aiohttp --no-project pytest tests -v
