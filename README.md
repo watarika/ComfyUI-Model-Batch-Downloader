@@ -111,12 +111,12 @@ Without `subfolder`, each category uses the following directory. A configured Co
 | `embeddings` | `models/embeddings` | ComfyUI prompt references; no companion loader |
 | `upscale_models` | `models/upscale_models` | `Load Upscale Model (Downloaded)` |
 | `onnx` | `models/onnx` | Impact Pack |
-| `sam3` | `models/sam3` | `comfyui-sam3` |
-| `llm` | `models/llm` | External LLM consumer; no companion loader |
+| `sam3` | `models/sam3` | `comfyui-sam3` path-based `(down)Load SAM3 Model`; default `models/sam3/sam3.pt` |
+| `llm` | `models/llm` | `ComfyUI_LLM_SDXL_Adapter`: `LLM Model Loader` / `LLM GGUF Model Loader`; no companion loader |
 | `ultralytics_bbox` | `models/ultralytics/bbox` | Impact Subpack |
 | `ultralytics_segm` | `models/ultralytics/segm` | Impact Subpack |
 
-Embedding files are used through prompt references and have no companion loader. LLM support covers single-file downloads only; it does not provide repository snapshots or multi-file inference. Impact Pack, `comfyui-sam3`, Impact Subpack, and other optional custom nodes are not dependencies of this downloader; install and use them separately when you need their consumer nodes.
+Embedding files are used through prompt references and have no companion loader. `comfyui-sam3` consumes a path string through its path-based `(down)Load SAM3 Model`; its default `models/sam3/sam3.pt` points to this downloader's default SAM3 destination, but this downloader does not provide a SAM3 companion loader. For LLM files, `ComfyUI_LLM_SDXL_Adapter` reads `models/llm` through `LLM Model Loader` and `LLM GGUF Model Loader`. LLM support covers single-file downloads only; it does not automatically provide repository snapshots or multi-file inference. Impact Pack, `comfyui-sam3`, `ComfyUI_LLM_SDXL_Adapter`, Impact Subpack, and other optional custom nodes are not dependencies of this downloader; install and use them separately when you need their consumer nodes.
 
 A concrete usage example for Anima:
 

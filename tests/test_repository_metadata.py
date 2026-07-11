@@ -145,46 +145,49 @@ def test_readmes_document_extended_category_contract_in_both_languages():
     english = (ROOT / "README.md").read_text(encoding="utf-8")
     japanese = (ROOT / "README_ja.md").read_text(encoding="utf-8")
 
-    categories = (
-        "checkpoints",
-        "diffusion_models",
-        "text_encoders",
-        "vae",
-        "loras",
-        "controlnet",
-        "embeddings",
-        "upscale_models",
-        "onnx",
-        "sam3",
-        "llm",
-        "ultralytics_bbox",
-        "ultralytics_segm",
+    def compatibility_rows(readme, header):
+        lines = readme.splitlines()
+        start = lines.index(header) + 2
+        rows = []
+        for line in lines[start:]:
+            if not line.strip():
+                break
+            cells = tuple(cell.strip() for cell in line.strip().strip("|").split("|"))
+            assert len(cells) == 3
+            rows.append(cells)
+        return tuple(rows)
+
+    shared_rows = (
+        ("`checkpoints`", "`models/checkpoints`", "`Load Checkpoint (Downloaded)`"),
+        ("`diffusion_models`", "`models/diffusion_models`", "`Load Diffusion Model (Downloaded)`"),
+        ("`text_encoders`", "`models/text_encoders`", "`Load CLIP (Downloaded)`"),
+        ("`vae`", "`models/vae`", "`Load VAE (Downloaded)`"),
+        ("`loras`", "`models/loras`", "`Load LoRA (Downloaded)`"),
+        ("`controlnet`", "`models/controlnet`", "`Load ControlNet (Downloaded)`"),
+        ("`upscale_models`", "`models/upscale_models`", "`Load Upscale Model (Downloaded)`"),
+        ("`onnx`", "`models/onnx`", "Impact Pack"),
+        ("`ultralytics_bbox`", "`models/ultralytics/bbox`", "Impact Subpack"),
+        ("`ultralytics_segm`", "`models/ultralytics/segm`", "Impact Subpack"),
     )
-    destinations = (
-        "models/checkpoints",
-        "models/diffusion_models",
-        "models/text_encoders",
-        "models/vae",
-        "models/loras",
-        "models/controlnet",
-        "models/embeddings",
-        "models/upscale_models",
-        "models/onnx",
-        "models/sam3",
-        "models/llm",
-        "models/ultralytics/bbox",
-        "models/ultralytics/segm",
-    )
-    for readme in (english, japanese):
-        for category in categories:
-            assert f"`{category}`" in readme
-        for destination in destinations:
-            assert f"`{destination}`" in readme
-        assert "`Load ControlNet (Downloaded)`" in readme
-        assert "`Load Upscale Model (Downloaded)`" in readme
-        assert "Impact Pack" in readme
-        assert "`comfyui-sam3`" in readme
-        assert "Impact Subpack" in readme
+    english_rows = shared_rows[:6] + (
+        ("`embeddings`", "`models/embeddings`", "ComfyUI prompt references; no companion loader"),
+    ) + shared_rows[6:8] + (
+        ("`sam3`", "`models/sam3`", "`comfyui-sam3` path-based `(down)Load SAM3 Model`; default `models/sam3/sam3.pt`"),
+        ("`llm`", "`models/llm`", "`ComfyUI_LLM_SDXL_Adapter`: `LLM Model Loader` / `LLM GGUF Model Loader`; no companion loader"),
+    ) + shared_rows[8:]
+    japanese_rows = shared_rows[:6] + (
+        ("`embeddings`", "`models/embeddings`", "ComfyUIのプロンプト参照。companion loaderなし"),
+    ) + shared_rows[6:8] + (
+        ("`sam3`", "`models/sam3`", "`comfyui-sam3`のpath-based `(down)Load SAM3 Model`。既定値`models/sam3/sam3.pt`"),
+        ("`llm`", "`models/llm`", "`ComfyUI_LLM_SDXL_Adapter`: `LLM Model Loader` / `LLM GGUF Model Loader`。companion loaderなし"),
+    ) + shared_rows[8:]
+
+    assert compatibility_rows(
+        english, "| `model_type` | Default directory | Companion loader / consumer |"
+    ) == english_rows
+    assert compatibility_rows(
+        japanese, "| `model_type` | 既定のディレクトリ | 対応loader / consumer |"
+    ) == japanese_rows
 
     assert "prompt references" in english
     assert "プロンプト参照" in japanese
