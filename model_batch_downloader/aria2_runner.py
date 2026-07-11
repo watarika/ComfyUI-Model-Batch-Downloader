@@ -19,6 +19,10 @@ from .security import auth_for_url, authenticated_url, redact
 
 
 logger = logging.getLogger(__name__)
+_CIVITAI_USER_AGENT = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+    "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3"
+)
 _STREAM_END = object()
 _STREAM_QUEUE_SIZE = 40
 
@@ -79,6 +83,8 @@ def _control_text(
         f"  split={item.split}",
         f"  max-connection-per-server={item.split}",
     ]
+    if auth.provider == "civitai":
+        lines.append(f"  header=User-Agent: {_CIVITAI_USER_AGENT}")
     if auth.header:
         lines.append(f"  header={auth.header[0]}: {auth.header[1]}")
     return "\n".join(lines) + "\n", auth.secrets
