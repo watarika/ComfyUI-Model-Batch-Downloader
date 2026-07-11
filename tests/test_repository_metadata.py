@@ -15,7 +15,7 @@ def test_pyproject_contains_publication_metadata():
         "Download and load multiple ComfyUI model files from Hugging Face, "
         "Civitai, and HTTP URLs."
     )
-    assert project["version"] == "0.1.0"
+    assert project["version"] == "0.2.0"
     assert project["requires-python"] == ">=3.10"
     assert project["license"] == {"file": "LICENSE"}
     assert project["dependencies"] == []
