@@ -35,26 +35,56 @@ def test_registry_workflow_matches_publication_contract():
     workflow = (ROOT / ".github/workflows/publish_action.yml").read_text(
         encoding="utf-8"
     )
-    for expected in (
-        "workflow_dispatch:",
-        "branches:",
-        "- main",
-        "paths:",
-        '- "pyproject.toml"',
-        "github.repository_owner == 'watarika'",
-        "actions/checkout@v4",
-        "Comfy-Org/publish-node-action@v1",
-        "secrets.REGISTRY_ACCESS_TOKEN",
-    ):
-        assert expected in workflow
+    expected = """name: Publish to Comfy registry
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "pyproject.toml"
+
+jobs:
+  publish-node:
+    name: Publish Custom Node to registry
+    runs-on: ubuntu-latest
+    if: ${{ github.repository_owner == 'watarika' }}
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+      - name: Publish Custom Node
+        uses: Comfy-Org/publish-node-action@v1
+        with:
+          personal_access_token: ${{ secrets.REGISTRY_ACCESS_TOKEN }}
+"""
+    assert workflow.replace("\r\n", "\n") == expected
 
 
 def test_mit_license_has_approved_copyright():
     license_text = (ROOT / "LICENSE").read_text(encoding="utf-8")
-    assert license_text.startswith("MIT License\n")
-    assert "Copyright (c) 2026 watarika" in license_text
-    assert "Permission is hereby granted, free of charge" in license_text
-    assert 'THE SOFTWARE IS PROVIDED "AS IS"' in license_text
+    expected = """MIT License
+
+Copyright (c) 2026 watarika
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+"""
+    assert license_text.replace("\r\n", "\n") == expected
 
 
 def test_readmes_are_bilingual_and_cover_the_same_topics():
