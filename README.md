@@ -2,7 +2,7 @@
 
 [English] [<a href="README_ja.md">日本語</a>]
 
-This custom node downloads multiple model files from Hugging Face, Civitai, and regular HTTP URLs with `aria2c`, then loads them within the same ComfyUI queue. It supports checkpoints, diffusion models, text encoders, VAEs, and LoRAs used with Illustrious, Anima, and Krea 2.
+This custom node downloads multiple ComfyUI model files from Hugging Face, Civitai, and arbitrary HTTP/HTTPS URLs with `aria2c`, then loads them within the same ComfyUI queue. It supports checkpoints, diffusion models, text encoders, VAEs, and LoRAs.
 
 Existing files are not overwritten, and checksums are not verified. Incomplete files with an `.aria2` sidecar are resumed.
 
@@ -55,13 +55,21 @@ Tokens are sent only to the corresponding domains and are not stored in the mani
 
 - `Model Download Batch`: A list UI with add and remove buttons. It stores canonical JSON internally.
 - `Model Download Batch (JSON)`: A direct JSON-input version using the same core.
-- `Load Checkpoint (Downloaded)`: Loads all-in-one checkpoints such as Illustrious.
-- `Load Diffusion Model (Downloaded)`: Loads diffusion models for Anima and Krea 2.
+- `Load Checkpoint (Downloaded)`: Loads models from the `checkpoints` category using ComfyUI's standard checkpoint loader behavior.
+- `Load Diffusion Model (Downloaded)`: Loads models from the `diffusion_models` category using ComfyUI's standard diffusion-model loader behavior.
 - `Load CLIP (Downloaded)`: Uses the same `type` choices as ComfyUI's standard `Load CLIP`, including `krea2`, `ideogram4`, and `flux2`.
-- `Load VAE (Downloaded)`: Loads VAEs such as Qwen Image VAE.
-- `Load LoRA (Downloaded)`: Loads compatible LoRAs. For model-only LoRAs, `strength_clip` can be set to 0.
+- `Load VAE (Downloaded)`: Loads models from the `vae` category using ComfyUI's standard VAE loader behavior.
+- `Load LoRA (Downloaded)`: Loads models from the `loras` category using ComfyUI's standard LoRA loader behavior. For model-only LoRAs, `strength_clip` can be set to 0.
 
 Both download nodes have an arbitrary-type `passthrough` input and output. They can be inserted into an existing connection or run unconnected as output nodes. To use downloaded results, connect `download_result` to the corresponding Downloaded Loader and specify the manifest `id`.
+
+## Usage examples
+
+The following model families illustrate common setups; they are examples, not an exhaustive compatibility list.
+
+- Illustrious: Download an all-in-one checkpoint to `checkpoints`, then load it with `Load Checkpoint (Downloaded)`.
+- Anima: Download a separate diffusion model, text encoder, and VAE to `diffusion_models`, `text_encoders`, and `vae`, then load each one with its corresponding Downloaded Loader.
+- Krea 2: Download a separate diffusion model and VAE to `diffusion_models` and `vae`. Download its text encoder to `text_encoders`, then select `krea2` in `Load CLIP (Downloaded)`.
 
 ## Download progress
 
@@ -88,7 +96,7 @@ The root is a JSON array containing at least one item. Each item supports these 
 | `id` | No | If omitted, the filename without its final extension |
 | `split` | No | 1–16; default 16 |
 
-Example for Anima:
+A concrete usage example for Anima:
 
 ```json
 [

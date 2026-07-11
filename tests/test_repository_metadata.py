@@ -93,8 +93,8 @@ def test_readmes_are_bilingual_and_cover_the_same_topics():
 
     assert '[English] [<a href="README_ja.md">日本語</a>]' in english
     assert '[<a href="README.md">English</a>] [日本語]' in japanese
-    assert "Hugging Face, Civitai, and regular HTTP URLs" in english
-    assert "Hugging Face、Civitai、通常のHTTP URL" in japanese
+    assert "Hugging Face, Civitai, and arbitrary HTTP/HTTPS URLs" in english
+    assert "Hugging Face、Civitai、任意のHTTP/HTTPS URL" in japanese
     assert (
         "git clone https://github.com/watarika/ComfyUI-Model-Batch-Downloader.git "
         "custom_nodes/ComfyUI-Model-Batch-Downloader"
@@ -117,3 +117,25 @@ def test_readmes_are_bilingual_and_cover_the_same_topics():
     for english_heading, japanese_heading in section_pairs:
         assert english_heading in english
         assert japanese_heading in japanese
+
+
+def test_readmes_describe_generic_scope_with_model_family_examples():
+    english = (ROOT / "README.md").read_text(encoding="utf-8")
+    japanese = (ROOT / "README_ja.md").read_text(encoding="utf-8")
+
+    assert (
+        "downloads multiple ComfyUI model files from Hugging Face, Civitai, "
+        "and arbitrary HTTP/HTTPS URLs"
+    ) in english
+    assert (
+        "Hugging Face、Civitai、任意のHTTP/HTTPS URLから複数のComfyUIモデルファイル"
+    ) in japanese
+    assert "## Usage examples" in english
+    assert "## 利用例" in japanese
+
+    for model_name in ("Illustrious", "Anima", "Krea 2"):
+        assert model_name in english
+        assert model_name in japanese
+
+    assert "used with Illustrious, Anima, and Krea 2" not in english
+    assert "Illustrious、Anima、Krea 2で使う" not in japanese
