@@ -1,7 +1,7 @@
 [project]
 name = "comfyui-model-batch-downloader"
 description = "Download and load multiple ComfyUI model files from Hugging Face, Civitai, and HTTP URLs."
-version = "0.2.0"
+version = "0.2.1"
 requires-python = ">=3.10"
 license = { file = "LICENSE" }
 dependencies = []

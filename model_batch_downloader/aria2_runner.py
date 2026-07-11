@@ -84,7 +84,7 @@ def _control_text(
         f"  max-connection-per-server={item.split}",
     ]
     if auth.provider == "civitai":
-        lines.append(f"  header=User-Agent: {_CIVITAI_USER_AGENT}")
+        lines.append(f"  user-agent={_CIVITAI_USER_AGENT}")
     if auth.header:
         lines.append(f"  header={auth.header[0]}: {auth.header[1]}")
     return "\n".join(lines) + "\n", auth.secrets
